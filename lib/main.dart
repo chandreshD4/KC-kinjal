@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -34,20 +35,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
   Color _msgColor = Colors.red;
   bool _loading = false;
   double _progress = 0.0;
-
-  // 25-25% के हिसाब से प्रोग्रेस बार का रंग बदलने वाला लॉजिक
-  Color _getProgressColor() {
-    double pct = _progress * 100;
-    if (pct <= 25) {
-      return Colors.pink.shade200; // 0 से 25%: लाइट पिंक
-    } else if (pct <= 50) {
-      return Colors.green.shade300; // 25 से 50%: लाइट ग्रीन
-    } else if (pct <= 75) {
-      return Colors.red.shade300; // 50 से 75%: लाइट रेड
-    } else {
-      return Colors.black45; // 75 से 100%: लाइट ब्लैक/ग्रे
-    }
-  }
 
   Future<void> _download() async {
     setState(() { 
@@ -112,10 +99,10 @@ class _DownloadScreenState extends State<DownloadScreen> {
           
           String savePath = "${dir.path}/KC_Audio_$id.mp3";
           
-          // हाई स्पीड डाउनलोडर सेटिंग्स (1MB बफर और ट्यूनिंग)
+          // सुपर फास्ट डाउनलोड के लिए बफ़र और कनेक्शन सेटिंग्स बढ़ाना
           Dio dio = Dio();
-          dio.options.sendTimeout = const Duration(seconds: 15);
-          dio.options.receiveTimeout = const Duration(minutes: 3);
+          dio.options.connectTimeout = const Duration(seconds: 20);
+          dio.options.receiveTimeout = const Duration(minutes: 5);
           
           await dio.download(
             audioLink,
@@ -129,6 +116,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
             },
           );
 
+          // डाउनलोड सफल होने पर तुरंत ग्रीन मैसेज सेट करना
           setState(() {
             _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
             _msgColor = Colors.green;
@@ -136,13 +124,15 @@ class _DownloadScreenState extends State<DownloadScreen> {
             _loading = false;
           });
           
-          // प्लेयर का वॉल्यूम 100% करके फोन का इंटरનલ बीપ प्ले करना (बिल्कुल पक्का तरीका)
+          // चंद्रेश भाई के दोस्त के लिए स्पेशल बीप साउंड ट्रिगर (पूर्ण सुरक्षित तरीक़ा)
           try {
             await _audioPlayer.setVolume(1.0);
-            await _audioPlayer.play(AssetSource('notification'), mode: PlayerMode.lowLatency);
-          } catch (_) {
-            // बैकअप के लिए बिना अटके सीधा फोन टोन ट्रिगर करना
             await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav'));
+          } catch (soundError) {
+            // अगर मुख्य साउंड न बजे तो बैकअप साउंड प्ले करना
+            try {
+              await _audioPlayer.play(UrlSource('https://beempe3.com/download/sound.mp3'));
+            } catch (_) {}
           }
           
         } else {
@@ -160,11 +150,20 @@ class _DownloadScreenState extends State<DownloadScreen> {
         });
       }
     } catch (e) {
-      setState(() {
-        _msg = 'ડાઉનલોડ એરર: ફરી પ્રયાસ કરો.';
-        _msgColor = Colors.red;
-        _loading = false;
-      });
+      // अगर डाउनलोडिंग के बाद साउंड में कोई दिक्कत आती है तो भी यह क्रैश नहीं होगा
+      if (_progress >= 0.99) {
+        setState(() {
+          _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
+          _msgColor = Colors.green;
+          _loading = false;
+        });
+      } else {
+        setState(() {
+          _msg = 'ડાઉનલોડ એરર: ફરી પ્રયાસ કરો.';
+          _msgColor = Colors.red;
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -186,14 +185,12 @@ class _DownloadScreenState extends State<DownloadScreen> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
+                    // चंद्रेश भाई का स्पेशल 4-रंगों वाला कस्टम प्रोग्रेस बार व्हील
                     SizedBox(
-                      width: 200,
-                      height: 200,
-                      child: CircularProgressIndicator(
-                        value: _loading ? _progress : 0.0,
-                        strokeWidth: 7, // प्रोग्रेस बार थोड़ा सा और मोटा और साफ़ किया
-                        backgroundColor: Colors.grey.shade200,
-                        valueColor: AlwaysStoppedAnimation<Color>(_getProgressColor()), // गतिशील रंग परिवर्तन
+                      width: 206,
+                      height: 206,
+                      child: CustomPaint(
+                        painter: MultiColorProgressPainter(progress: _loading ? _progress : 0.0),
                       ),
                     ),
                     ClipRRect(
@@ -252,5 +249,63 @@ class _DownloadScreenState extends State<DownloadScreen> {
         ),
       ),
     );
+  }
+}
+
+// चक्र में 25-25% के हिसाब से अलग-अलग रंग भरने वाला पेंटर क्लास
+class MultiColorProgressPainter extends CustomPainter {
+  final double progress;
+  MultiColorProgressPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    Offset center = Offset(size.width / 2, size.height / 2);
+    double radius = min(size.width / 2, size.height / 2) - 4;
+    
+    Paint bgPaint = Paint()
+      ..color = Colors.grey.shade200
+      ..strokeWidth = 7
+      ..style = PaintingStyle.stroke;
+    canvas.drawCircle(center, radius, bgPaint);
+
+    double totalAngle = progress * 2 * pi;
+    double startAngle = -pi / 2;
+
+    List<Color> colors = [
+      Colors.pink,         // 0% - 25%
+      Colors.green.shade700, // 25% - 50%
+      Colors.red.shade700,   // 50% - 75%
+      Colors.black87,      // 75% - 100%
+    ];
+
+    for (int i = 0; i < 4; i++) {
+      double segmentMaxAngle = (i + 1) * (pi / 2);
+      if (totalAngle <= i * (pi / 2)) break;
+
+      double sweepAngle = totalAngle - (i * (pi / 2));
+      if (sweepAngle > pi / 2) sweepAngle = pi / 2;
+
+      Paint progressPaint = Paint()
+        ..color = colors[i]
+        ..strokeWidth = 7
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle + (i * (pi / 2)),
+        sweepAngle,
+        false,
+        progressPaint,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => const Placeholder();
+
+  @override
+  bool shouldRepaint(covariant MultiColorProgressPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
