@@ -178,7 +178,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
               if (_errorMessage.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text(_errorMessage, style: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold), textAlign: Center),
+                  child: Text(_errorMessage, style: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                 ),
             ],
           ),
