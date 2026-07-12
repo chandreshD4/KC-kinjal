@@ -6,10 +6,8 @@ import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const MyApp());
-}
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,15 +19,11 @@ class MyApp extends StatelessWidget {
       ),
       home: const DownloadScreen(),
     );
-  }
-}
 
 class DownloadScreen extends StatefulWidget {
-  const DownloadScreen({super.key});
 
   @override
   State<DownloadScreen> createState() => _DownloadScreenState();
-}
 
 class _DownloadScreenState extends State<DownloadScreen> {
   final TextEditingController _urlController = TextEditingController();
@@ -40,40 +34,29 @@ class _DownloadScreenState extends State<DownloadScreen> {
     setState(() {
       _errorMessage = '';
       _isLoading = true;
-    });
 
     // स्टोरेज अनुमति चेक करना
     var status = await Permission.manageExternalStorage.status;
     if (!status.isGranted) {
       status = await Permission.manageExternalStorage.request();
-    }
     await Permission.storage.request();
 
     if (!status.isGranted) {
       setState(() {
         _errorMessage = 'કૃપા કરીને ડાઉનલોડ કરવા માટે સ્ટોરેજ પરમિશન ઓન કરો.';
         _isLoading = false;
-      });
       openAppSettings();
       return;
-    }
 
     // यूट्यूब लिंक को एकदम साफ करना
     String cleanUrl = _urlController.text.trim();
-    while (cleanUrl.startsWith("'") || cleanUrl.startsWith("‘") || cleanUrl.startsWith(".") || cleanUrl.startsWith("_")) {
-      cleanUrl = cleanUrl.substring(1);
-    }
 
     String videoId = cleanUrl;
     if (cleanUrl.contains('v=')) {
       videoId = cleanUrl.split('v=')[1].split('&')[0];
-    } else if (cleanUrl.contains('youtu.be/')) {
       videoId = cleanUrl.split('youtu.be/')[1].split('?')[0];
-    } else if (cleanUrl.contains('?si=')) {
       videoId = cleanUrl.split('/').last.split('?')[0];
-    } else if (cleanUrl.contains('_')) {
       videoId = cleanUrl.split('_').last;
-    }
 
     final String apiUrl = 'https://youtube-mp4-mp3-downloader.p.rapidapi.com/api/v1/download?format=$format&id=$videoId&audioQuality=128&addInfo=false&allowExtendedDuration=false';
     
@@ -84,7 +67,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
           'Content-Type': 'application/json',
           'x-rapidapi-key': '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
           'x-rapidapi-host': 'youtube-mp4-mp3-downloader.p.rapidapi.com',
-        },
       );
 
       if (response.statusCode == 200) {
@@ -97,32 +79,17 @@ class _DownloadScreenState extends State<DownloadScreen> {
           final directory = Directory('/storage/emulated/0/Download/Raju Bhai');
           if (!await directory.exists()) {
             await directory.create(recursive: true);
-          }
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('ડાઉનલોડ શરૂ થયું! ફાઇલ Download/Raju Bhai માં સેવ થશે.')),
           );
-        } else {
           // अगर रिपॉन्स में कोई भी लिंक नहीं मिला, तो सर्वर का असली मैसेज दिखाना ताकि पता चले बात क्या है
           setState(() {
-            _errorMessage = 'API એરર: વીડિયો ડેટા મળ્યો નથી. સર્વર સંદેશ: ${data['message'] ?? 'લિમિટ પૂરી થઈ હોઈ શકે.'}';
-          });
-        }
-      } else {
         setState(() {
-          _errorMessage = 'સર્વર એરર: કોડ ${response.statusCode}. કૃપા કરીને API કી તપાસો.';
-        });
-      }
-    } catch (e) {
       setState(() {
         _errorMessage = 'કનેક્શન એરર: $e';
-      });
-    } finally {
       setState(() {
         _isLoading = false;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -183,5 +150,3 @@ class _DownloadScreenState extends State<DownloadScreen> {
         ),
       ),
     );
-  }
-}
