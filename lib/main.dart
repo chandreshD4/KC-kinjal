@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 void main() => runApp(const MyApp());
 
@@ -26,11 +29,15 @@ class DownloadScreen extends StatefulWidget {
 
 class _DownloadScreenState extends State<DownloadScreen> {
   final _urlController = TextEditingController();
+  final AudioPlayer _audioPlayer = AudioPlayer();
   String _msg = '';
   bool _loading = false;
+  double _progress = 0.0; // लाइव प्रोग्रेस ट्रैक करने के लिए
 
   Future<void> _download() async {
-    setState(() { _msg = ''; _loading = true; });
+    setState(() { _msg = ''; _loading = true; _progress = 0.0; });
+    
+    // स्टोरेज परमिशन सुनिश्चित करना
     await Permission.manageExternalStorage.request();
     
     String url = _urlController.text.trim();
@@ -57,7 +64,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
     }
 
     try {
-      // YouTube Media Downloader का सही कन्वर्टर एंडपॉइंट
+      // स्टेप 1: रैपिड-API से डाउनलोड लिंक प्राप्त करना
       final res = await http.get(
         Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=$id'),
         headers: {
@@ -68,15 +75,43 @@ class _DownloadScreenState extends State<DownloadScreen> {
       
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        
-        // इस API के रिस्पॉन्स से ऑडियो (MP3) का बेस्ट लिंक ढूंढना
         String? audioLink;
         if (data['audios'] != null && data['audios']['items'] != null && data['audios']['items'].isNotEmpty) {
           audioLink = data['audios']['items'][0]['url'];
         }
         
         if (audioLink != null) {
-          setState(() => _msg = 'સફળતા! ઓડિયો ડાઉનલોડ શરૂ થયું.');
+          // स्टेप 2: 'Raju Bhai' फोल्डर का पाथ सेट करना
+          final dir = Directory('/storage/emulated/0/Raju Bhai');
+          if (!await dir.exists()) {
+            await dir.create(recursive: true);
+          }
+          
+          String savePath = "${dir.path}/KC_Audio_$id.mp3";
+          
+          // स्टेप 3: Dio के जरिए लाइव प्रोग्रेस डाउनलोड शुरू करना
+          Dio dio = Dio();
+          await dio.download(
+            audioLink,
+            savePath,
+            onReceiveProgress: (received, total) {
+              if (total != -1) {
+                setState(() {
+                  _progress = received / total;
+                });
+              }
+            },
+          );
+
+          // स्टेप 4: डाउनलोड पूर्ण होने पर रिंगटोन बजाना और सफलता संदेश
+          setState(() {
+            _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
+            _progress = 1.0;
+          });
+          
+          // सिस्टम की डिफ़ॉल्ट नोटिफिकेशन टोन बजाना
+          await _audioPlayer.play(UrlSource('https://www.soundjay.com/buttons/sounds/button-09a.mp3'));
+          
         } else {
           setState(() => _msg = 'API એરર: ઓડિયો લિંક મળી નથી.');
         }
@@ -84,7 +119,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
         setState(() => _msg = 'સર્વર રિસ્પોન્સ એરર કોડ: ${res.statusCode}');
       }
     } catch (e) {
-      setState(() => _msg = 'કનેક્શન એરર: ફરી પ્રયાસ કરો.');
+      setState(() => _msg = 'ડાઉનલોડ એરર: ફરી પ્રયાસ કરો.');
     } finally {
       setState(() { _loading = false; });
     }
@@ -104,15 +139,47 @@ class _DownloadScreenState extends State<DownloadScreen> {
           child: Column(
             children: [
               const SizedBox(height: 20),
+              // प्ले स्टोर स्टाइल इमेज के चारों तरफ लाइव घूमने वाला प्रोग्रेस बार
               Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(100),
-                  child: Image.asset('assets/profile.png', width: 180, height: 180, fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_circle, size: 180, color: Colors.grey),
-                  ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 200,
+                      height: 200,
+                      child: CircularProgressIndicator(
+                        value: _loading ? _progress : 0.0,
+                        strokeWidth: 6,
+                        backgroundColor: Colors.grey.shade200,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.pink),
+                      ),
+                    ),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(100),
+                      child: Image.asset('assets/profile.png', width: 180, height: 180, fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_circle, size: 180, color: Colors.grey),
+                      ),
+                    ),
+                    // इमेज के ठीक बीच में बड़े अक्षरों में लाइव परसेंटेज
+                    if (_loading)
+                      Container(
+                        width: 180,
+                        height: 180,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Center(
+                          child: Text(
+                            "${(_progress * 100).toStringAsFixed(0)}%",
+                            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 15),
+              const SizedBox(height: 20),
               const Text('આરાધના MP3 Downloader VIP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 30),
               TextField(
@@ -130,15 +197,14 @@ class _DownloadScreenState extends State<DownloadScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
                 ),
                 onPressed: _loading ? null : _download,
-                icon: const Icon(Icons.music_note, color: Colors.white), // केवल एक सिंगल वाइट म्यूजिक आइकॉन
+                icon: const Icon(Icons.music_note, color: Colors.white),
                 label: const Text('Download MP3', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 30),
-              if (_loading) const CircularProgressIndicator(color: Colors.pink),
               if (_msg.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text(_msg, style: const TextStyle(color: Colors.red, fontSize: 15, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                  child: Text(_msg, style: const TextStyle(color: Colors.green, fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                 ),
             ],
           ),
