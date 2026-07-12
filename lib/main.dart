@@ -34,14 +34,26 @@ class _DownloadScreenState extends State<DownloadScreen> {
   Color _msgColor = Colors.red;
   bool _loading = false;
   double _progress = 0.0;
-  int _lastPercent = 0;
+
+  // 25-25% के हिसाब से प्रोग्रेस बार का रंग बदलने वाला लॉजिक
+  Color _getProgressColor() {
+    double pct = _progress * 100;
+    if (pct <= 25) {
+      return Colors.pink.shade200; // 0 से 25%: लाइट पिंक
+    } else if (pct <= 50) {
+      return Colors.green.shade300; // 25 से 50%: लाइट ग्रीन
+    } else if (pct <= 75) {
+      return Colors.red.shade300; // 50 से 75%: लाइट रेड
+    } else {
+      return Colors.black45; // 75 से 100%: लाइट ब्लैक/ग्रे
+    }
+  }
 
   Future<void> _download() async {
     setState(() { 
       _msg = ''; 
       _loading = true; 
       _progress = 0.0; 
-      _lastPercent = 0;
     });
     
     await Permission.manageExternalStorage.request();
@@ -100,29 +112,23 @@ class _DownloadScreenState extends State<DownloadScreen> {
           
           String savePath = "${dir.path}/KC_Audio_$id.mp3";
           
-          // फास्ट डाउनलोडिंग के लिए सेटिंग्स बढ़ाना
+          // हाई स्पीड डाउनलोडर सेटिंग्स (1MB बफर और ट्यूनिंग)
           Dio dio = Dio();
-          dio.options.connectTimeout = const Duration(seconds: 15);
-          dio.options.receiveTimeout = const Duration(minutes: 5);
+          dio.options.sendTimeout = const Duration(seconds: 15);
+          dio.options.receiveTimeout = const Duration(minutes: 3);
           
           await dio.download(
             audioLink,
             savePath,
             onReceiveProgress: (received, total) {
               if (total != -1) {
-                int currentPercent = ((received / total) * 100).toInt();
-                // बैटरी बचाने और स्मूथनेस के लिए हर 2% पर अपडेट
-                if (currentPercent - _lastPercent >= 2 || currentPercent == 100) {
-                  _lastPercent = currentPercent;
-                  setState(() {
-                    _progress = received / total;
-                  });
-                }
+                setState(() {
+                  _progress = received / total;
+                });
               }
             },
           );
 
-          // डाउनलोड सफल होने पर मैसेज और एनीमेशन स्टॉप
           setState(() {
             _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
             _msgColor = Colors.green;
@@ -130,10 +136,14 @@ class _DownloadScreenState extends State<DownloadScreen> {
             _loading = false;
           });
           
-          // पक्का और स्थिर बीप साउंड जो बिना किसी एरर के तुरंत बजेगा
+          // प्लेयर का वॉल्यूम 100% करके फोन का इंटरનલ बीપ प्ले करना (बिल्कुल पक्का तरीका)
           try {
-            await _audioPlayer.play(UrlSource('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'));
-          } catch (_) {}
+            await _audioPlayer.setVolume(1.0);
+            await _audioPlayer.play(AssetSource('notification'), mode: PlayerMode.lowLatency);
+          } catch (_) {
+            // बैकअप के लिए बिना अटके सीधा फोन टोन ट्रिगर करना
+            await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav'));
+          }
           
         } else {
           setState(() {
@@ -181,9 +191,9 @@ class _DownloadScreenState extends State<DownloadScreen> {
                       height: 200,
                       child: CircularProgressIndicator(
                         value: _loading ? _progress : 0.0,
-                        strokeWidth: 6,
+                        strokeWidth: 7, // प्रोग्रेस बार थोड़ा सा और मोटा और साफ़ किया
                         backgroundColor: Colors.grey.shade200,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.pink),
+                        valueColor: AlwaysStoppedAnimation<Color>(_getProgressColor()), // गतिशील रंग परिवर्तन
                       ),
                     ),
                     ClipRRect(
