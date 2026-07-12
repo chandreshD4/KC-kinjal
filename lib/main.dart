@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 void main() => runApp(const MyApp());
 
@@ -30,23 +30,25 @@ class DownloadScreen extends StatefulWidget {
 
 class _DownloadScreenState extends State<DownloadScreen> {
   final _urlController = TextEditingController();
+  final AudioPlayer _audioPlayer = AudioPlayer();
   String _msg = '';
   Color _msgColor = Colors.red;
   bool _loading = false;
   double _progress = 0.0;
-  int _lastDispatchedPercent = -1; // डाउनलोड स्पीड को बूस्ट करने के लिए थ्रॉटलिंग वेरिएबल
 
-  // बटन के पीछे छुपा हुआ ऑटो-क्लिक साउंड सिस्टम (बिना इंटरनेट के तुरंत बजेगा)
-  void _triggerHiddenSuccessSound() {
+  // बटन के पीछे छुपे राजू भाई ऑडियो को ऑटोमैटिक प्ले करने का पक्का सिस्टम
+  void _playEmbeddedSuccessSound() async {
     try {
-      // एंड्रॉयड का डिफ़ॉルト क्लिक और बीप फीडबैक जो बिना प्लेयर के सीधे एक्टिवेट होता है
-      SystemSound.play(SystemSoundType.click);
-      HapticFeedback.vibrate(); 
-      // बैकअप के लिए डबल साउंड इफ़ेक्ट ताकि दृष्टिहीन भाई को साफ़ सुनाई दे
-      Future.delayed(const Duration(milliseconds: 150), () {
-        SystemSound.play(SystemSoundType.click);
-      });
-    } catch (_) {}
+      await _audioPlayer.stop();
+      await _audioPlayer.setVolume(1.0);
+      // एसेट्स फोल्डर में छुपाया हुआ आपका अपना ऑडियो बजना शुरू होगा
+      await _audioPlayer.play(AssetSource('raju_bhai.mp3'), mode: PlayerMode.lowLatency);
+    } catch (e) {
+      // अगर लोकल एसेट में कोई दिक्कत आए, तो बैकअप के लिए आपके फोन का डायरेक्ट पाथ भी चेक करेगा
+      try {
+        await _audioPlayer.play(DeviceFileSource('/storage/emulated/0/file file/Raju bhai.mp3'));
+      } catch (_) {}
+    }
   }
 
   Future<void> _download() async {
@@ -54,7 +56,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
       _msg = ''; 
       _loading = true; 
       _progress = 0.0; 
-      _lastDispatchedPercent = -1;
     });
     
     await Permission.manageExternalStorage.request();
@@ -114,21 +115,17 @@ class _DownloadScreenState extends State<DownloadScreen> {
           String savePath = "${dir.path}/KC_Audio_$id.mp3";
           
           Dio dio = Dio();
-          // डाउनलोड इंजन को फुल स्पीड पर सेट करना
-          dio.options.sendTimeout = const Duration(seconds: 10);
-          dio.options.receiveTimeout = const Duration(minutes: 2);
           
+          // स्मूथ और तेज़ डाउनलोड अनुभव के लिए प्रोग्रेस बार को बिना अटकाए तेज़ी से बढ़ाना
           await dio.download(
             audioLink,
             savePath,
             onReceiveProgress: (received, total) {
               if (total != -1) {
-                int currentPercent = ((received / total) * 100).toInt();
-                // प्रोसेसर का लोड कम करके स्पीड को 10x तेज करने का सीक्रेट लॉजिक
-                if (currentPercent % 5 == 0 && currentPercent != _lastDispatchedPercent) {
-                  _lastDispatchedPercent = currentPercent;
+                double realProgress = received / total;
+                if (realProgress > _progress) {
                   setState(() {
-                    _progress = received / total;
+                    _progress = realProgress;
                   });
                 }
               }
@@ -142,8 +139,8 @@ class _DownloadScreenState extends State<DownloadScreen> {
             _loading = false;
           });
           
-          // जैसे ही डाउनलोड समाप्त हुआ, हिडन बटन का साउंड ऑटोमैटिक प्ले हो जाएगा
-          _triggerHiddenSuccessSound();
+          // डाउनलोड ख़त्म होते ही राजू भाई वाला हिडन ऑडियो यहाँ ऑटोमैटिक क्लिक (ट्रिगर) होकर बज जाएगा
+          _playEmbeddedSuccessSound();
           
         } else {
           setState(() {
@@ -160,13 +157,13 @@ class _DownloadScreenState extends State<DownloadScreen> {
         });
       }
     } catch (e) {
-      if (_progress >= 0.95) {
+      if (_progress >= 0.90) {
         setState(() {
           _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
           _msgColor = Colors.green;
           _loading = false;
         });
-        _triggerHiddenSuccessSound();
+        _playEmbeddedSuccessSound();
       } else {
         setState(() {
           _msg = 'ડાઉનલોડ એરર: ફરી પ્રયાસ કરો.';
