@@ -39,35 +39,47 @@ class _DownloadScreenState extends State<DownloadScreen> {
       return;
     }
 
-    // सीधे और सुरक्षित तरीके से वीडियो ID निकालना
+    // स्मार्ट वीडियो आईडी एक्सट्रैक्टर (टूटी हुई लिंक से भी आईडी निकाल लेगा)
     String id = '';
-    if (url.contains('v=')) {
-      id = url.split('v=')[1].split('&')[0];
-    } else if (url.contains('youtu.be/')) {
-      id = url.split('youtu.be/')[1].split('?')[0];
-    } else {
-      id = url.split('/').last.split('?')[0];
+    RegExp regExp = RegExp(r'([a-zA-Z0-9_-]{11})');
+    Iterable<Match> matches = regExp.allMatches(url);
+    for (Match match in matches) {
+      String possibleId = match.group(0)!;
+      if (possibleId != 'youtu' && possibleId != 'watch') {
+        id = possibleId;
+        break;
+      }
+    }
+
+    if (id.isEmpty || id.length != 11) {
+      setState(() { _msg = 'ખોટી લિંક: આઈડી મળી નથી.'; _loading = false; });
+      return;
     }
 
     try {
-      // बिना रैपिड-API के सीधे हाई-स्पीड ऑडियो सर्वर का उपयोग
+      // आपके नए यूट्यूब MP3 डाउनलोडर API का सीधा कनेक्शन
       final res = await http.get(
-        Uri.parse('https://api.decentents.com/api/v1/youtube/download?id=$id&type=mp3'),
+        Uri.parse('https://youtube-mp3-downloader5.p.rapidapi.com/?youtube_url=https://www.youtube.com/watch?v=$id'),
+        headers: {
+          'x-rapidapi-key': '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
+          'x-rapidapi-host': 'youtube-mp3-downloader5.p.rapidapi.com'
+        },
       );
       
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        String? link = data['url'] ?? data['downloadUrl'] ?? data['result'];
+        // नए API के रिस्पॉन्स के हिसाब से लिंक ढूंढना
+        String? link = data['downloadUrl'] ?? data['url'] ?? data['link'] ?? data['result'];
         if (link != null) {
           setState(() => _msg = 'સફળતા! ઓડિયો ડાઉનલોડ શરૂ થયું.');
         } else {
-          setState(() => _msg = 'સર્વર એરર: લિંક જનરેટ થઈ શકી નથી.');
+          setState(() => _msg = 'API એરર: ${data['message'] ?? 'લિંક જનરેટ થઈ નથી.'}');
         }
       } else {
-        setState(() => _msg = 'સર્વર કનેક્શન નિષ્ફળ (કોડ: ${res.statusCode})');
+        setState(() => _msg = 'સર્વર રિસ્પોન્સ એરર કોડ: ${res.statusCode}');
       }
     } catch (e) {
-      setState(() => _msg = 'કનેક્શન એરર: સર્વર વ્યસ્ત છે, ફરી પ્રયાસ કરો.');
+      setState(() => _msg = 'કનેક્શન એરર: ફરી પ્રયાસ કરો.');
     } finally {
       setState(() => _loading = false);
     }
