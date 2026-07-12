@@ -21,21 +21,20 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      # 1. एकदम फ्रेश एंड्रॉइड स्ट्रक्चर तैयार करना
+      # यहाँ हम ऐप का नाम बदलकर 'KC-ARADHANA' कर रहे हैं
       - name: Create Fresh Android Native Files
         run: |
           flutter create . --org com.example --project-name kc_kinjal --platforms android
 
-      # 2. गिटहब सर्वर पर ही इंटरनेट और स्टोरेज अनुमतियाँ इंजेक्ट करना
-      - name: Inject Internet and Storage Permissions
+      - name: Inject Internet and Storage Permissions & App Name
         run: |
           MANIFEST_PATH="android/app/src/main/AndroidManifest.xml"
-          # इंटरनेट और स्टोरेज अनुमति जोड़ना
+          # इंटरनेट और स्टोरेज अनुमतियाँ जोड़ना
           sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />' $MANIFEST_PATH
-          # Legacy Storage जोड़ना ताकि Android 10+ में राजू भाई फोल्डर में सेव हो सके
+          # Legacy Storage और नया नाम सेट करना
+          sed -i 's/android:label="kc_kinjal"/android:label="KC-ARADHANA"/' $MANIFEST_PATH
           sed -i 's/<application/<application android:requestLegacyExternalStorage="true"/' $MANIFEST_PATH
 
-      # 3. गिटहब सर्ver पर ही आपका आइकॉन (assets/icon.png) मुख्य आइकॉन की जगह सेट करना
       - name: Configure Main App Icon
         run: |
           cp assets/icon.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
