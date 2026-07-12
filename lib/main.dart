@@ -34,14 +34,14 @@ class _DownloadScreenState extends State<DownloadScreen> {
   Color _msgColor = Colors.red;
   bool _loading = false;
   double _progress = 0.0;
-  int _lastNotificationPercent = 0; // बैटरी बचाने के लिए प्रोग्रेस थ्रॉटलिंग
+  int _lastPercent = 0;
 
   Future<void> _download() async {
     setState(() { 
       _msg = ''; 
       _loading = true; 
       _progress = 0.0; 
-      _lastNotificationPercent = 0;
+      _lastPercent = 0;
     });
     
     await Permission.manageExternalStorage.request();
@@ -100,16 +100,20 @@ class _DownloadScreenState extends State<DownloadScreen> {
           
           String savePath = "${dir.path}/KC_Audio_$id.mp3";
           
+          // फास्ट डाउनलोडिंग के लिए सेटिंग्स बढ़ाना
           Dio dio = Dio();
+          dio.options.connectTimeout = const Duration(seconds: 15);
+          dio.options.receiveTimeout = const Duration(minutes: 5);
+          
           await dio.download(
             audioLink,
             savePath,
             onReceiveProgress: (received, total) {
               if (total != -1) {
                 int currentPercent = ((received / total) * 100).toInt();
-                // बैटरी सेवर लॉजिक: प्रोग्रेस बार को केवल तभी अपडेट करें जब कम से कम 2% का बदलाव हो
-                if (currentPercent - _lastNotificationPercent >= 2 || currentPercent == 100) {
-                  _lastNotificationPercent = currentPercent;
+                // बैटरी बचाने और स्मूथनेस के लिए हर 2% पर अपडेट
+                if (currentPercent - _lastPercent >= 2 || currentPercent == 100) {
+                  _lastPercent = currentPercent;
                   setState(() {
                     _progress = received / total;
                   });
@@ -118,21 +122,18 @@ class _DownloadScreenState extends State<DownloadScreen> {
             },
           );
 
-          // डाउनलोड पूरी तरह सफल होने पर ही यह ब्लॉक चलेगा
+          // डाउनलोड सफल होने पर मैसेज और एनीमेशन स्टॉप
           setState(() {
             _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
-            _msgColor = Colors.green; // सफलता का मैसेज ग्रीन कलर में
+            _msgColor = Colors.green;
             _progress = 1.0;
-            _loading = false; // एनीमेशन तुरंत स्टॉप (बैटरी सेवर)
+            _loading = false;
           });
           
-          // एंड्रॉयड सिस्टम की डिफ़ॉल्ट नोटिफिकेशन टोन बजाना (पक्का इलाज)
+          // पक्का और स्थिर बीप साउंड जो बिना किसी एरर के तुरंत बजेगा
           try {
-            await _audioPlayer.play(AndroidAudioSource("notification"));
-          } catch (_) {
-            // अगर कोई पाबंदी हो तो बैकअप साउंड
-            await _audioPlayer.play(UrlSource('https://beempe3.com/download/sound.mp3'));
-          }
+            await _audioPlayer.play(UrlSource('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'));
+          } catch (_) {}
           
         } else {
           setState(() {
@@ -210,7 +211,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text('આરાधના MP3 Downloader VIP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const Text('આરાધના MP3 Downloader VIP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 30),
               TextField(
                 controller: _urlController,
