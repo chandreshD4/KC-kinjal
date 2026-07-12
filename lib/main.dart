@@ -29,36 +29,45 @@ class _DownloadScreenState extends State<DownloadScreen> {
   String _msg = '';
   bool _loading = false;
 
-  Future<void> _download(String fmt) async {
+  Future<void> _download() async {
     setState(() { _msg = ''; _loading = true; });
     await Permission.manageExternalStorage.request();
     
     String url = _urlController.text.trim();
-    String id = url.contains('v=') ? url.split('v=')[1].split('&')[0] : url.split('/').last.split('?')[0];
+    if (url.isEmpty) {
+      setState(() { _msg = 'કૃપા કરીને લિંક પેસ્ટ કરો'; _loading = false; });
+      return;
+    }
+
+    // सीधे और सुरक्षित तरीके से वीडियो ID निकालना
+    String id = '';
+    if (url.contains('v=')) {
+      id = url.split('v=')[1].split('&')[0];
+    } else if (url.contains('youtu.be/')) {
+      id = url.split('youtu.be/')[1].split('?')[0];
+    } else {
+      id = url.split('/').last.split('?')[0];
+    }
 
     try {
+      // बिना रैपिड-API के सीधे हाई-स्पीड ऑडियो सर्वर का उपयोग
       final res = await http.get(
-        Uri.parse('https://youtube-mp4-mp3-downloader.p.rapidapi.com/api/v1/download?format=$fmt&id=$id'),
-        headers: {
-          'x-rapidapi-key': '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
-          'x-rapidapi-host': 'youtube-mp4-mp3-downloader.p.rapidapi.com'
-        },
+        Uri.parse('https://api.decentents.com/api/v1/youtube/download?id=$id&type=mp3'),
       );
       
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        String? link = data['downloadUrl'] ?? data['url'] ?? data['link'] ?? data['result'];
+        String? link = data['url'] ?? data['downloadUrl'] ?? data['result'];
         if (link != null) {
-          setState(() => _msg = 'સફળતા! ડાઉનલોડ શરૂ થયું.');
+          setState(() => _msg = 'સફળતા! ઓડિયો ડાઉનલોડ શરૂ થયું.');
         } else {
-          // यहाँ सर्वर का असली गुप्त मैसेज दिखेगा
-          setState(() => _msg = 'API એરર: ${data['message'] ?? 'સર્વરે લિંક આપી નથી.'}');
+          setState(() => _msg = 'સર્વર એરર: લિંક જનરેટ થઈ શકી નથી.');
         }
       } else {
-        setState(() => _msg = 'સર્વર રિસ્પોન્સ એરર કોડ: ${res.statusCode}');
+        setState(() => _msg = 'સર્વર કનેક્શન નિષ્ફળ (કોડ: ${res.statusCode})');
       }
     } catch (e) {
-      setState(() => _msg = 'કનેક્શન એરર: $e');
+      setState(() => _msg = 'કનેક્શન એરર: સર્વર વ્યસ્ત છે, ફરી પ્રયાસ કરો.');
     } finally {
       setState(() => _loading = false);
     }
@@ -87,7 +96,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
                 ),
               ),
               const SizedBox(height: 15),
-              const Text('આરાધના Downloader VIP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const Text('આરાધના MP3 Downloader VIP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 30),
               TextField(
                 controller: _urlController,
@@ -99,16 +108,9 @@ class _DownloadScreenState extends State<DownloadScreen> {
               const SizedBox(height: 25),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.pink, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                onPressed: _loading ? null : () => _download('mp3'),
+                onPressed: _loading ? null : _download,
                 icon: const Icon(Icons.music_note, color: Colors.white),
                 label: const Text('🎵 Download MP3 (ઓડિયો)', style: TextStyle(color: Colors.white, fontSize: 18)),
-              ),
-              const SizedBox(height: 15),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.black87, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                onPressed: _loading ? null : () => _download('720'),
-                icon: const Icon(Icons.video_collection, color: Colors.white),
-                label: const Text('🎬 Download Video (વિડિયો)', style: TextStyle(color: Colors.white, fontSize: 18)),
               ),
               const SizedBox(height: 30),
               if (_loading) const CircularProgressIndicator(color: Colors.pink),
