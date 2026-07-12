@@ -21,10 +21,10 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      # यहाँ गिटहब खुद बिल्कुल फ्रेश, बिना एरर वाला नया एंड्रॉइड फोल्डर और सही वर्जन सेट करेगा
+      # यहाँ हम फ्लटर को साफ़ तौर पर 'kc_kinjal' नाम दे रहे हैं ताकि कोई एरर न आए
       - name: Create Fresh Android Native Files
         run: |
-          flutter create . --org com.example --platforms android
+          flutter create . --org com.example --project-name kc_kinjal --platforms android
           
       - name: Fetch Clean Dependencies
         run: flutter pub get
