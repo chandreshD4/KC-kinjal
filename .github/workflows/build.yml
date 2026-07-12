@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK FROM SCRATCH
 
 on:
   push:
@@ -11,15 +11,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '17'
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
-      - run: flutter pub get
-      - run: flutter build apk --release
+
+      # यहाँ गिटहब खुद बिल्कुल फ्रेश, बिना एरर वाला नया एंड्रॉइड फोल्डर और सही वर्जन सेट करेगा
+      - name: Create Fresh Android Native Files
+        run: |
+          flutter create . --org com.example --platforms android
+          
+      - name: Fetch Clean Dependencies
+        run: flutter pub get
+
+      - name: Build New Release APK
+        run: flutter build apk --release
+
       - uses: actions/upload-artifact@v4
         with:
           name: release-apk
