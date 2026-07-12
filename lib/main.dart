@@ -3,7 +3,20 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:permission_handler/permission_handler.dart';
 
-void main() => runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: DownloadScreen()));
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'KC-ARADHANA',
+      theme: ThemeData(primarySwatch: Colors.pink),
+      home: const DownloadScreen(),
+    );
+  }
+}
 
 class DownloadScreen extends StatefulWidget {
   const DownloadScreen({super.key});
@@ -13,46 +26,100 @@ class DownloadScreen extends StatefulWidget {
 
 class _DownloadScreenState extends State<DownloadScreen> {
   final _urlController = TextEditingController();
-  String _msg = 'तैयार है!';
+  String _msg = '';
+  bool _loading = false;
 
   Future<void> _download(String fmt) async {
-    setState(() => _msg = 'डाउनलोड हो रहा है...');
+    setState(() { _msg = ''; _loading = true; });
     await Permission.manageExternalStorage.request();
+    
     String url = _urlController.text.trim();
     String id = url.contains('v=') ? url.split('v=')[1].split('&')[0] : url.split('/').last.split('?')[0];
 
     try {
       final res = await http.get(
         Uri.parse('https://youtube-mp4-mp3-downloader.p.rapidapi.com/api/v1/download?format=$fmt&id=$id'),
-        headers: {'x-rapidapi-key': '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3', 'x-rapidapi-host': 'youtube-mp4-mp3-downloader.p.rapidapi.com'},
+        headers: {
+          'x-rapidapi-key': '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
+          'x-rapidapi-host': 'youtube-mp4-mp3-downloader.p.rapidapi.com'
+        },
       );
+      
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        if (data['downloadUrl'] != null || data['url'] != null) {
-          setState(() => _msg = 'सफलता! डाउनलोड शुरू हुआ.');
+        String? link = data['downloadUrl'] ?? data['url'] ?? data['link'] ?? data['result'];
+        if (link != null) {
+          setState(() => _msg = 'સફળતા! ડાઉનલોડ શરૂ થયું.');
         } else {
-          setState(() => _msg = 'एरर: लिंक नहीं मिला.');
+          // यहाँ सर्वर का असली गुप्त मैसेज दिखेगा
+          setState(() => _msg = 'API એરર: ${data['message'] ?? 'સર્વરે લિંક આપી નથી.'}');
         }
       } else {
-        setState(() => _msg = 'सर्वर एरर: ${res.statusCode}');
+        setState(() => _msg = 'સર્વર રિસ્પોન્સ એરર કોડ: ${res.statusCode}');
       }
-    } catch (e) { setState(() => _msg = 'एरर: $e'); }
+    } catch (e) {
+      setState(() => _msg = 'કનેક્શન એરર: $e');
+    } finally {
+      setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('KC-ARADHANA')),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(children: [
-          TextField(controller: _urlController, decoration: const InputDecoration(hintText: 'यूट्यूब लिंक यहाँ डालें')),
-          const SizedBox(height: 20),
-          ElevatedButton(onPressed: () => _download('mp3'), child: const Text('MP3 डाउनलोड करें')),
-          ElevatedButton(onPressed: () => _download('720'), child: const Text('विडियो डाउनलोड करें')),
-          const SizedBox(height: 20),
-          Text(_msg, style: const TextStyle(color: Colors.pink, fontWeight: FontWeight.bold)),
-        ]),
+      appBar: AppBar(
+        title: const Text('Welcome to KC-ARADHANA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.pink,
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(100),
+                  child: Image.asset('assets/profile.png', width: 180, height: 180, fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_circle, size: 180, color: Colors.grey),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 15),
+              const Text('આરાધના Downloader VIP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 30),
+              TextField(
+                controller: _urlController,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                  hintText: 'યૂટ્યૂબ લિંક અહીં પેસ્ટ કરો',
+                ),
+              ),
+              const SizedBox(height: 25),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.pink, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                onPressed: _loading ? null : () => _download('mp3'),
+                icon: const Icon(Icons.music_note, color: Colors.white),
+                label: const Text('🎵 Download MP3 (ઓડિયો)', style: TextStyle(color: Colors.white, fontSize: 18)),
+              ),
+              const SizedBox(height: 15),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.black87, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                onPressed: _loading ? null : () => _download('720'),
+                icon: const Icon(Icons.video_collection, color: Colors.white),
+                label: const Text('🎬 Download Video (વિડિયો)', style: TextStyle(color: Colors.white, fontSize: 18)),
+              ),
+              const SizedBox(height: 30),
+              if (_loading) const CircularProgressIndicator(color: Colors.pink),
+              if (_msg.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(_msg, style: const TextStyle(color: Colors.red, fontSize: 15, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
