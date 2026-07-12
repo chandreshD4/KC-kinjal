@@ -31,22 +31,31 @@ class _DownloadScreenState extends State<DownloadScreen> {
   final _urlController = TextEditingController();
   final AudioPlayer _audioPlayer = AudioPlayer();
   String _msg = '';
+  Color _msgColor = Colors.red;
   bool _loading = false;
-  double _progress = 0.0; // लाइव प्रोग्रेस ट्रैक करने के लिए
+  double _progress = 0.0;
+  int _lastNotificationPercent = 0; // बैटरी बचाने के लिए प्रोग्रेस थ्रॉटलिंग
 
   Future<void> _download() async {
-    setState(() { _msg = ''; _loading = true; _progress = 0.0; });
+    setState(() { 
+      _msg = ''; 
+      _loading = true; 
+      _progress = 0.0; 
+      _lastNotificationPercent = 0;
+    });
     
-    // स्टोरेज परमिशन सुनिश्चित करना
     await Permission.manageExternalStorage.request();
     
     String url = _urlController.text.trim();
     if (url.isEmpty) {
-      setState(() { _msg = 'કૃપા કરીને લિંક પેસ્ટ કરો'; _loading = false; });
+      setState(() { 
+        _msg = 'કૃપા કરીને લિંક પેસ્ટ કરો'; 
+        _msgColor = Colors.red;
+        _loading = false; 
+      });
       return;
     }
 
-    // स्मार्ट वीडियो आईडी एक्सट्रैक्टर
     String id = '';
     RegExp regExp = RegExp(r'([a-zA-Z0-9_-]{11})');
     Iterable<Match> matches = regExp.allMatches(url);
@@ -59,12 +68,15 @@ class _DownloadScreenState extends State<DownloadScreen> {
     }
 
     if (id.isEmpty || id.length != 11) {
-      setState(() { _msg = 'ખોટી લિંક: આઈડી મળી નથી.'; _loading = false; });
+      setState(() { 
+        _msg = 'ખોટી લિંક: આઈડી મળી નથી.'; 
+        _msgColor = Colors.red;
+        _loading = false; 
+      });
       return;
     }
 
     try {
-      // स्टेप 1: रैपिड-API से डाउनलोड लिंक प्राप्त करना
       final res = await http.get(
         Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=$id'),
         headers: {
@@ -81,7 +93,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
         }
         
         if (audioLink != null) {
-          // स्टेप 2: 'Raju Bhai' फोल्डर का पाथ सेट करना
           final dir = Directory('/storage/emulated/0/Raju Bhai');
           if (!await dir.exists()) {
             await dir.create(recursive: true);
@@ -89,39 +100,60 @@ class _DownloadScreenState extends State<DownloadScreen> {
           
           String savePath = "${dir.path}/KC_Audio_$id.mp3";
           
-          // स्टेप 3: Dio के जरिए लाइव प्रोग्रेस डाउनलोड शुरू करना
           Dio dio = Dio();
           await dio.download(
             audioLink,
             savePath,
             onReceiveProgress: (received, total) {
               if (total != -1) {
-                setState(() {
-                  _progress = received / total;
-                });
+                int currentPercent = ((received / total) * 100).toInt();
+                // बैटरी सेवर लॉजिक: प्रोग्रेस बार को केवल तभी अपडेट करें जब कम से कम 2% का बदलाव हो
+                if (currentPercent - _lastNotificationPercent >= 2 || currentPercent == 100) {
+                  _lastNotificationPercent = currentPercent;
+                  setState(() {
+                    _progress = received / total;
+                  });
+                }
               }
             },
           );
 
-          // स्टेप 4: डाउनलोड पूर्ण होने पर रिंगटोन बजाना और सफलता संदेश
+          // डाउनलोड पूरी तरह सफल होने पर ही यह ब्लॉक चलेगा
           setState(() {
             _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
+            _msgColor = Colors.green; // सफलता का मैसेज ग्रीन कलर में
             _progress = 1.0;
+            _loading = false; // एनीमेशन तुरंत स्टॉप (बैटरी सेवर)
           });
           
-          // सिस्टम की डिफ़ॉल्ट नोटिफिकेशन टोन बजाना
-          await _audioPlayer.play(UrlSource('https://www.soundjay.com/buttons/sounds/button-09a.mp3'));
+          // एंड्रॉयड सिस्टम की डिफ़ॉल्ट नोटिफिकेशन टोन बजाना (पक्का इलाज)
+          try {
+            await _audioPlayer.play(AndroidAudioSource("notification"));
+          } catch (_) {
+            // अगर कोई पाबंदी हो तो बैकअप साउंड
+            await _audioPlayer.play(UrlSource('https://beempe3.com/download/sound.mp3'));
+          }
           
         } else {
-          setState(() => _msg = 'API એરર: ઓડિયો લિંક મળી નથી.');
+          setState(() {
+            _msg = 'API એરર: ઓડિયો લિંક મળી નથી.';
+            _msgColor = Colors.red;
+            _loading = false;
+          });
         }
       } else {
-        setState(() => _msg = 'સર્વર રિસ્પોન્સ એરર કોડ: ${res.statusCode}');
+        setState(() {
+          _msg = 'સર્વર રિસ્પોન્સ એરર કોડ: ${res.statusCode}';
+          _msgColor = Colors.red;
+          _loading = false;
+        });
       }
     } catch (e) {
-      setState(() => _msg = 'ડાઉનલોડ એરર: ફરી પ્રયાસ કરો.');
-    } finally {
-      setState(() { _loading = false; });
+      setState(() {
+        _msg = 'ડાઉનલોડ એરર: ફરી પ્રયાસ કરો.';
+        _msgColor = Colors.red;
+        _loading = false;
+      });
     }
   }
 
@@ -139,7 +171,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              // प्ले स्टोर स्टाइल इमेज के चारों तरफ लाइव घूमने वाला प्रोग्रेस बार
               Center(
                 child: Stack(
                   alignment: Alignment.center,
@@ -160,7 +191,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
                         errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_circle, size: 180, color: Colors.grey),
                       ),
                     ),
-                    // इमेज के ठीक बीच में बड़े अक्षरों में लाइव परसेंटेज
                     if (_loading)
                       Container(
                         width: 180,
@@ -180,7 +210,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text('આરાધના MP3 Downloader VIP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const Text('આરાधના MP3 Downloader VIP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 30),
               TextField(
                 controller: _urlController,
@@ -204,7 +234,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
               if (_msg.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text(_msg, style: const TextStyle(color: Colors.green, fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                  child: Text(_msg, style: TextStyle(color: _msgColor, fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                 ),
             ],
           ),
