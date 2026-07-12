@@ -39,7 +39,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
       return;
     }
 
-    // स्मार्ट वीडियो आईडी एक्सट्रैक्टर (टूटी हुई लिंक से भी आईडी निकाल लेगा)
+    // स्मार्ट वीडियो आईडी एक्सट्रैक्टर
     String id = '';
     RegExp regExp = RegExp(r'([a-zA-Z0-9_-]{11})');
     Iterable<Match> matches = regExp.allMatches(url);
@@ -57,23 +57,28 @@ class _DownloadScreenState extends State<DownloadScreen> {
     }
 
     try {
-      // आपके नए यूट्यूब MP3 डाउनलोडर API का सीधा कनेक्शन
+      // YouTube Media Downloader का सही कन्वर्टर एंडपॉइंट
       final res = await http.get(
-        Uri.parse('https://youtube-mp3-downloader5.p.rapidapi.com/?youtube_url=https://www.youtube.com/watch?v=$id'),
+        Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=$id'),
         headers: {
           'x-rapidapi-key': '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
-          'x-rapidapi-host': 'youtube-mp3-downloader5.p.rapidapi.com'
+          'x-rapidapi-host': 'youtube-media-downloader.p.rapidapi.com'
         },
       );
       
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        // नए API के रिस्पॉन्स के हिसाब से लिंक ढूंढना
-        String? link = data['downloadUrl'] ?? data['url'] ?? data['link'] ?? data['result'];
-        if (link != null) {
+        
+        // इस API के रिस्पॉन्स से ऑडियो (MP3) का बेस्ट लिंक ढूंढना
+        String? audioLink;
+        if (data['audios'] != null && data['audios']['items'] != null && data['audios']['items'].isNotEmpty) {
+          audioLink = data['audios']['items'][0]['url'];
+        }
+        
+        if (audioLink != null) {
           setState(() => _msg = 'સફળતા! ઓડિયો ડાઉનલોડ શરૂ થયું.');
         } else {
-          setState(() => _msg = 'API એરર: ${data['message'] ?? 'લિંક જનરેટ થઈ નથી.'}');
+          setState(() => _msg = 'API એરર: ઓડિયો લિંક મળી નથી.');
         }
       } else {
         setState(() => _msg = 'સર્વર રિસ્પોન્સ એરર કોડ: ${res.statusCode}');
@@ -81,7 +86,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
     } catch (e) {
       setState(() => _msg = 'કનેક્શન એરર: ફરી પ્રયાસ કરો.');
     } finally {
-      setState(() => _loading = false);
+      setState(() { _loading = false; });
     }
   }
 
@@ -119,10 +124,14 @@ class _DownloadScreenState extends State<DownloadScreen> {
               ),
               const SizedBox(height: 25),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.pink, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pink, 
+                  minimumSize: const Size(double.infinity, 55), 
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
+                ),
                 onPressed: _loading ? null : _download,
-                icon: const Icon(Icons.music_note, color: Colors.white),
-                label: const Text('🎵 Download MP3 (ઓડિયો)', style: TextStyle(color: Colors.white, fontSize: 18)),
+                icon: const Icon(Icons.music_note, color: Colors.white), // केवल एक सिंगल वाइट म्यूजिक आइकॉन
+                label: const Text('Download MP3', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 30),
               if (_loading) const CircularProgressIndicator(color: Colors.pink),
