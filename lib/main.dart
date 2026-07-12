@@ -3,24 +3,21 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:audioplayers/audioplayers.dart';
 
 void main() {
-  runApp(const AaradhanaDownloaderApp());
+  runApp(const MyApp());
 }
 
-class AaradhanaDownloaderApp extends StatelessWidget {
-  const AaradhanaDownloaderApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'આરાધના Downloader VIP',
       debugShowCheckedModeBanner: false,
+      title: 'KC-ARADHANA',
       theme: ThemeData(
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: Colors.white,
-        primaryColor: const Color(0xFFFF2A4B),
+        primarySwatch: Colors.pink,
       ),
       home: const DownloadScreen(),
     );
@@ -36,279 +33,156 @@ class DownloadScreen extends StatefulWidget {
 
 class _DownloadScreenState extends State<DownloadScreen> {
   final TextEditingController _urlController = TextEditingController();
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  String _errorMessage = '';
   bool _isLoading = false;
-  double _progress = 0.0;
-  String _statusMessage = "";
-  bool _isSuccess = false;
 
-  final String _apiKey = "2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3";
-  final String _apiHost = "youtube-mp4-mp3-downloader.p.rapidapi.com";
+  // बटन दबाते ही परमिशन मांगने और डाउनलोड शुरू करने का मुख्य फंक्शन
+  Future<void> handleDownload(String format) async {
+    setState(() {
+      _errorMessage = '';
+      _isLoading = true;
+    });
 
-  String _extractVideoId(String url) {
-    if (url.contains("youtu.be/")) {
-      return url.split("youtu.be/")[1].split("?")[0].trim();
-    } else if (url.contains("v=")) {
-      return url.split("v=")[1].split("&")[0].trim();
-    } else if (url.contains("embed/")) {
-      return url.split("embed/")[1].split("?")[0].trim();
+    // 1. सबसे पहले 'Manage All Files' और स्टोरेज की अनुमति मांगना
+    var status = await Permission.manageExternalStorage.status;
+    if (!status.isGranted) {
+      status = await Permission.manageExternalStorage.request();
     }
-    return url.trim();
-  }
-
-  Future<Directory?> _prepareStorageFolder() async {
-    if (Platform.isAndroid) {
-      if (await Permission.manageExternalStorage.request().isGranted ||
-          await Permission.storage.request().isGranted) {
-        final dir = Directory('/storage/emulated/0/RajuBhai');
-        if (!await dir.exists()) {
-          await dir.create(recursive: true);
-        }
-        return dir;
-      }
-    }
-    return null;
-  }
-
-  Future<void> _saveFile(List<int> bytes, String prefix, String extension) async {
-    final folder = await _prepareStorageFolder();
-    if (folder == null) throw Exception("સ્ટોરેજ પરમિશન નથી મળી!");
     
-    final fileName = "${prefix}_${DateTime.now().millisecondsSinceEpoch}.$extension";
-    final file = File("${folder.path}/$fileName");
-    await file.writeAsBytes(bytes);
-  }
+    var storageStatus = await Permission.storage.request();
 
-  Future<void> _playSuccessAudio() async {
-    try {
-      await _audioPlayer.play(AssetSource('raju_bhai.mp3'));
-    } catch (e) {
-      debugPrint("ઓડિયો પ્લે કરવામાં એરર: $e");
-    }
-  }
-
-  Future<void> _startDownloadProcess(bool isAudio) async {
-    final rawUrl = _urlController.text.trim();
-    if (rawUrl.isEmpty) {
-      setState(() => _statusMessage = "❌ કૃપા કરીને પહેલા યુટ્યુબ લિંક નાખો!");
+    if (!status.isGranted && !storageStatus.isGranted) {
+      setState(() {
+        _errorMessage = 'कृपया डाउनलोड करने के लिए स्टोरेज की अनुमति ऑन करें।';
+        _isLoading = false;
+      });
+      // अगर परमिशन नहीं है, तो सीधे सिस्टम सेटिंग्स पेज खोलना
+      openAppSettings();
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _progress = 0.0;
-      _statusMessage = "🚀 સર્વર સાથે કનેક્ટ થઈ રહ્યું છે...";
-      _isSuccess = false;
-    });
+    // यूट्यूब इनपुट लिंक को साफ करना (शुरुआत के सिंबल हटाना)
+    String cleanUrl = _urlController.text.trim();
+    if (cleanUrl.startsWith("'") || cleanUrl.startsWith("‘") || cleanUrl.startsWith(".")) {
+      cleanUrl = cleanUrl.substring(1);
+    }
 
-    final videoId = _extractVideoId(rawUrl);
+    // लिंक से वीडियो ID निकालना
+    String videoId = cleanUrl;
+    if (cleanUrl.contains('v=')) {
+      videoId = cleanUrl.split('v=')[1].split('&')[0];
+    } else if (cleanUrl.contains('youtu.be/')) {
+      videoId = cleanUrl.split('youtu.be/')[1].split('?')[0];
+    } else if (cleanUrl.contains('?si=')) {
+      videoId = cleanUrl.split('/').last.split('?')[0];
+    }
+
+    // 2. आपकी सटीक API Key और सही Host के साथ रिक्वेस्ट भेजना
+    final String apiUrl = 'https://youtube-mp4-mp3-downloader.p.rapidapi.com/api/v1/download?format=$format&id=$videoId&audioQuality=128&addInfo=false&allowExtendedDuration=false';
     
     try {
       final response = await http.get(
-        Uri.parse("https://$_apiHost/api/v1/download?format=720&id=$videoId&audioQuality=128&addInfo=false&allowExtendedDuration=false"),
+        Uri.parse(apiUrl),
         headers: {
-          "x-rapidapi-key": _apiKey,
-          "x-rapidapi-host": _apiHost
+          'Content-Type': 'application/json',
+          'x-rapidapi-key': '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
+          'x-rapidapi-host': 'youtube-mp4-mp3-downloader.p.rapidapi.com',
         },
-      ).timeout(const Duration(seconds: 20));
-      
+      );
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        String? dlUrl;
-        
-        if (isAudio) {
-          dlUrl = data['audioUrls']?[0];
-        } else {
-          dlUrl = data['videoUrls']?[0]?['url'];
-        }
-        
-        if (dlUrl != null) {
-          bool success = await _downloadBinaryWithProgress(dlUrl, isAudio ? "MP3" : "MP4");
-          setState(() {
-            _isLoading = false;
-            if (success) {
-              _progress = 1.0;
-              _isSuccess = true;
-              _statusMessage = "✅ 'RajuBhai' ફોલ્ડરમાં સફળતાપૂર્વક સેવ થઈ ગયું!";
-              _playSuccessAudio();
-            } else {
-              _statusMessage = "❌ ડાઉનલોડ ફેલ થયું! ડાઉનલોડ લિંક એક્સપાયર થઈ ગઈ છે.";
-            }
-          });
+        String? downloadUrl = data['downloadUrl'] ?? data['url'];
+
+        if (downloadUrl != null) {
+          // राजू भाई फोल्डर बनाना और फाइल सेव करना
+          final directory = Directory('/storage/emulated/0/Download/Raju Bhai');
+          if (!await directory.exists()) {
+            await directory.create(recursive: true);
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('डाउनलोड शुरू हुआ! फाइल Download/Raju Bhai में सेव होगी।')),
+          );
         } else {
           setState(() {
-            _isLoading = false;
-            _statusMessage = "❌ API એરર: વિડિઓ ડેટા મળ્યો નથી (લિમિટ પૂરી થઈ હોઈ શકે).";
+            _errorMessage = 'API एरर: विडियो डेटा मल्यो नथी (लिमिट पूरी थई होई शके).';
           });
         }
       } else {
         setState(() {
-          _isLoading = false;
-          _statusMessage = "❌ સર્વર રિસ્પોન્સ એરર: Code ${response.statusCode} (તમારી API કી લિમિટ પૂરી થઈ ગઈ છે)";
+          _errorMessage = 'सर्वर एरर: कोड ${response.statusCode}';
         });
       }
     } catch (e) {
       setState(() {
+        _errorMessage = 'कनेक्शन एरर: $e';
+      });
+    } finally {
+      setState(() {
         _isLoading = false;
-        _statusMessage = "❌ સિસ્ટમ એરર: ${e.toString().split('\n')[0]}";
       });
     }
-  }
-
-  Future<bool> _downloadBinaryWithProgress(String url, String type) async {
-    try {
-      final request = http.Request('GET', Uri.parse(url));
-      final response = await http.Client().send(request);
-      
-      if (response.statusCode != 200) return false;
-
-      final totalBytes = response.contentLength ?? 0;
-      List<int> bytes = [];
-      num lastProgress = -1;
-
-      await for (var chunk in response.stream) {
-        bytes.addAll(chunk);
-        if (totalBytes > 0) {
-          double currentProgress = bytes.length / totalBytes;
-          int percent = (currentProgress * 100).toInt();
-          if (percent != lastProgress) {
-            lastProgress = percent;
-            setState(() {
-              _progress = currentProgress;
-              _statusMessage = "📥 ડાઉનલોડ થઈ રહ્યું છે: $percent%";
-            });
-          }
-        }
-      }
-
-      await _saveFile(bytes, "RajuBhai", type.toLowerCase());
-      return true;
-    } catch (_) { return false; }
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    _urlController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.only(top: 50, bottom: 20),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFF2A4B),
-            ),
-            child: const Center(
-              child: Text(
-                "Welcome to KC-ARADHANA",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 1,
+      appBar: AppBar(
+        title: const Text('Welcome to KC-ARADHANA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.pink,
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              if (Navigator.canPop(context) == false)
+                Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(100),
+                    child: Image.asset('assets/profile.png', width: 180, height: 180, fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_circle, size: 180, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 15),
+              const Text('આરાધના Downloader VIP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 30),
+              TextField(
+                controller: _urlController,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                  hintText: 'यूट्यूब लिंक यहाँ पेस्ट करें',
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.pink, width: 2)),
                 ),
               ),
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  Container(
-                    width: 130,
-                    height: 130,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFFF2A4B), width: 3),
-                      image: const DecorationImage(
-                        image: AssetImage('assets/profile.png'),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  const Text(
-                    "આરાધના Downloader VIP",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
-                  const SizedBox(height: 35),
-                  TextField(
-                    controller: _urlController,
-                    style: const TextStyle(color: Colors.black),
-                    decoration: InputDecoration(
-                      hintText: 'અહીં યુટ્યુબ લિંક પેસ્ટ કરો...',
-                      hintStyle: const TextStyle(color: Colors.black38),
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFFF2A4B), width: 2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 25),
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : () => _startDownloadProcess(true),
-                    icon: const Icon(Icons.music_note, color: Colors.white),
-                    label: const Text("🎵 Download MP3 (ઓડિયો)", style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF2A4B),
-                      minimumSize: const Size(double.infinity, 54),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : () => _startDownloadProcess(false),
-                    icon: const Icon(Icons.movie, color: Colors.white),
-                    label: const Text("🎥 Download Video (વિડિયો)", style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF333333),
-                      minimumSize: const Size(double.infinity, 54),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  if (_isLoading || _statusMessage.isNotEmpty) ...[
-                    const SizedBox(height: 30),
-                    if (_isLoading)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: _progress,
-                          backgroundColor: Colors.grey[200],
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF2A4B)),
-                          minHeight: 6,
-                        ),
-                      ),
-                    const SizedBox(height: 15),
-                    Text(
-                      _statusMessage,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: _isSuccess ? Colors.green[700] : (_statusMessage.startsWith("❌") ? Colors.red[700] : Colors.black87),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ]
-                ],
+              const SizedBox(height: 25),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.pink, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                onPressed: _isLoading ? null : () => handleDownload('mp3'),
+                icon: const Icon(Icons.music_note, color: Colors.white),
+                label: const Text('🎵 Download MP3 (ઓડિયો)', style: TextStyle(color: Colors.white, fontSize: 18)),
               ),
-            ),
+              const SizedBox(height: 15),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.black87, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                onPressed: _isLoading ? null : () => handleDownload('720'),
+                icon: const Icon(Icons.video_collection, color: Colors.white),
+                label: const Text('🎬 Download Video (વિડિયો)', style: TextStyle(color: Colors.white, fontSize: 18)),
+              ),
+              const SizedBox(height: 30),
+              if (_isLoading) const CircularProgressIndicator(color: Colors.pink),
+              if (_errorMessage.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(_errorMessage, style: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold), textAlign: Center),
+                ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
