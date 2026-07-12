@@ -1,5 +1,5 @@
-name: ck_aradhana
-description: "A new Flutter project."
+name: kc_aradhana
+description: "A VIP YouTube MP3 Downloader App"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -11,15 +11,15 @@ dependencies:
     sdk: flutter
   http: ^1.1.0
   permission_handler: ^11.0.1
-  audioplayers: ^5.2.1
+  dio: ^5.4.0
+  audioplayers: ^6.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.0
+  flutter_lints: ^3.0.0
 
 flutter:
   uses-material-design: true
   assets:
     - assets/profile.png
-    - assets/raju_bhai.mp3
