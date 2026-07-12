@@ -28,11 +28,7 @@ jobs:
       - name: Inject Internet and All Files Storage Permissions & App Name
         run: |
           MANIFEST_PATH="android/app/src/main/AndroidManifest.xml"
-          
-          # मैनिफेस्ट में पक्की अनुमतियाँ इंजेक्ट करना
           sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />' $MANIFEST_PATH
-          
-          # ऐप का नाम बदलकर लॉन्चर में 'KC-ARADHANA' सेट करना
           sed -i 's/android:label="kc_kinjal"/android:label="KC-ARADHANA"/' $MANIFEST_PATH
           sed -i 's/<application/<application android:requestLegacyExternalStorage="true"/' $MANIFEST_PATH
 

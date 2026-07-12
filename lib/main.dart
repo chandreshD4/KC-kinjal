@@ -206,7 +206,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
             ),
             child: const Center(
               child: Text(
-                "Welcome to Raju Bhai",
+                "Welcome to KC-ARADHANA",
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
