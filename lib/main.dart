@@ -36,38 +36,34 @@ class _DownloadScreenState extends State<DownloadScreen> {
   String _errorMessage = '';
   bool _isLoading = false;
 
-  // बटन दबाते ही परमिशन मांगने और डाउनलोड शुरू करने का मुख्य फंक्शन
   Future<void> handleDownload(String format) async {
     setState(() {
       _errorMessage = '';
       _isLoading = true;
     });
 
-    // 1. सबसे पहले 'Manage All Files' और स्टोरेज की अनुमति मांगना
+    // स्टोरेज अनुमति चेक करना
     var status = await Permission.manageExternalStorage.status;
     if (!status.isGranted) {
       status = await Permission.manageExternalStorage.request();
     }
-    
-    var storageStatus = await Permission.storage.request();
+    await Permission.storage.request();
 
-    if (!status.isGranted && !storageStatus.isGranted) {
+    if (!status.isGranted) {
       setState(() {
-        _errorMessage = 'कृपया डाउनलोड करने के लिए स्टोरेज की अनुमति ऑन करें।';
+        _errorMessage = 'કૃપા કરીને ડાઉનલોડ કરવા માટે સ્ટોરેજ પરમિશન ઓન કરો.';
         _isLoading = false;
       });
-      // अगर परमिशन नहीं है, तो सीधे सिस्टम सेटिंग्स पेज खोलना
       openAppSettings();
       return;
     }
 
-    // यूट्यूब इनपुट लिंक को साफ करना (शुरुआत के सिंबल हटाना)
+    // यूट्यूब लिंक को एकदम साफ करना
     String cleanUrl = _urlController.text.trim();
-    if (cleanUrl.startsWith("'") || cleanUrl.startsWith("‘") || cleanUrl.startsWith(".")) {
+    while (cleanUrl.startsWith("'") || cleanUrl.startsWith("‘") || cleanUrl.startsWith(".") || cleanUrl.startsWith("_")) {
       cleanUrl = cleanUrl.substring(1);
     }
 
-    // लिंक से वीडियो ID निकालना
     String videoId = cleanUrl;
     if (cleanUrl.contains('v=')) {
       videoId = cleanUrl.split('v=')[1].split('&')[0];
@@ -75,9 +71,10 @@ class _DownloadScreenState extends State<DownloadScreen> {
       videoId = cleanUrl.split('youtu.be/')[1].split('?')[0];
     } else if (cleanUrl.contains('?si=')) {
       videoId = cleanUrl.split('/').last.split('?')[0];
+    } else if (cleanUrl.contains('_')) {
+      videoId = cleanUrl.split('_').last;
     }
 
-    // 2. आपकी सटीक API Key और सही Host के साथ रिक्वेस्ट भेजना
     final String apiUrl = 'https://youtube-mp4-mp3-downloader.p.rapidapi.com/api/v1/download?format=$format&id=$videoId&audioQuality=128&addInfo=false&allowExtendedDuration=false';
     
     try {
@@ -92,31 +89,33 @@ class _DownloadScreenState extends State<DownloadScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        String? downloadUrl = data['downloadUrl'] ?? data['url'];
+        
+        // जादुई बाईपास: सर्वर जिस भी नाम से लिंक भेजेगा, यह उसे ढूंढ निकालेगा
+        String? downloadUrl = data['downloadUrl'] ?? data['url'] ?? data['link'] ?? data['data']?['url'] ?? data['result'];
 
-        if (downloadUrl != null) {
-          // राजू भाई फोल्डर बनाना और फाइल सेव करना
+        if (downloadUrl != null && downloadUrl.isNotEmpty) {
           final directory = Directory('/storage/emulated/0/Download/Raju Bhai');
           if (!await directory.exists()) {
             await directory.create(recursive: true);
           }
 
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('डाउनलोड शुरू हुआ! फाइल Download/Raju Bhai में सेव होगी।')),
+            const SnackBar(content: Text('ડાઉનલોડ શરૂ થયું! ફાઇલ Download/Raju Bhai માં સેવ થશે.')),
           );
         } else {
+          // अगर रिपॉन्स में कोई भी लिंक नहीं मिला, तो सर्वर का असली मैसेज दिखाना ताकि पता चले बात क्या है
           setState(() {
-            _errorMessage = 'API एरर: विडियो डेटा मल्यो नथी (लिमिट पूरी थई होई शके).';
+            _errorMessage = 'API એરર: વીડિયો ડેટા મળ્યો નથી. સર્વર સંદેશ: ${data['message'] ?? 'લિમિટ પૂરી થઈ હોઈ શકે.'}';
           });
         }
       } else {
         setState(() {
-          _errorMessage = 'सर्वर एरर: कोड ${response.statusCode}';
+          _errorMessage = 'સર્વર એરર: કોડ ${response.statusCode}. કૃપા કરીને API કી તપાસો.';
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'कनेक्शन एरर: $e';
+        _errorMessage = 'કનેક્શન એરર: $e';
       });
     } finally {
       setState(() {
@@ -139,15 +138,14 @@ class _DownloadScreenState extends State<DownloadScreen> {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              if (Navigator.canPop(context) == false)
-                Center(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(100),
-                    child: Image.asset('assets/profile.png', width: 180, height: 180, fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_circle, size: 180, color: Colors.grey),
-                    ),
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(100),
+                  child: Image.asset('assets/profile.png', width: 180, height: 180, fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_circle, size: 180, color: Colors.grey),
                   ),
                 ),
+              ),
               const SizedBox(height: 15),
               const Text('આરાધના Downloader VIP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 30),
@@ -155,7 +153,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
                 controller: _urlController,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                  hintText: 'यूट्यूब लिंक यहाँ पेस्ट करें',
+                  hintText: 'યૂટ્યૂબ લિંક અહીં પેસ્ટ કરો',
                   focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.pink, width: 2)),
                 ),
               ),
@@ -178,7 +176,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
               if (_errorMessage.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text(_errorMessage, style: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                  child: Text(_errorMessage, style: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold), textAlign: Center),
                 ),
             ],
           ),
