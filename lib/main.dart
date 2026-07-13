@@ -35,16 +35,30 @@ class _DownloadScreenState extends State<DownloadScreen> {
   Color _msgColor = Colors.red;
   bool _loading = false;
   double _progress = 0.0;
+  
+  // टेस्ट के लिए एरर नंबर दिखाने वाला वेरिएबल
+  String _errorIndicator = '';
 
-  // बटन के पीछे छुपे राजू भाई ऑडियो को ऑटोमैटिक प्ले करने का पक्का सिस्टम
+  // 10 API कीज़ की लिस्ट (पहली की का आखरी अक्षर X किया है ताकि वो फेल हो और टेस्ट हो सके)
+  final List<String> _apiKeys = [
+    '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7dX', // 1. पुरानी की (जानबूझकर गलत की गई)
+    '56c7be4e11mshc2e6b844bd5ac96p13fecbjsndb1fed17bf4a', // 2. नई की
+    '6906d6daefmsh9ba387dda0a1de1p18ad1fjsnfd1f1c384510', // 3. नई की
+    'c3cc862b66msh3e61fd05fadea5dp136bd3jsn63fc9b4566dd', // 4. नई की
+    '8439a37d89msh4c70f081f5f1d90p19bcecjsn123e5abcf25f', // 5. नई की
+    '1a4b97a95cmsh63119b201c78c23p1ca86cjsnc46a1e2d735d', // 6. नई की
+    '38c1d62c4cmsh9d4bb1e235f76fap1b1367jsnc7189c1883d2', // 7. नई की
+    'e1ba887686msh8b0d392e439e4c4p14de4djsn54bf1674261b', // 8. नई की
+    '73e7f04058mshb08f095390e591ap15c478jsn0302e4b31bfc', // 9. नई की
+    '57e13dd96amsh82abf541e085d9ap1e2a55jsn70db8a26c985', // 10. नई की
+  ];
+
   void _playEmbeddedSuccessSound() async {
     try {
       await _audioPlayer.stop();
       await _audioPlayer.setVolume(1.0);
-      // एसेट्स फोल्डर में छुपाया हुआ आपका अपना ऑडियो बजना शुरू होगा
       await _audioPlayer.play(AssetSource('raju_bhai.mp3'), mode: PlayerMode.lowLatency);
     } catch (e) {
-      // अगर लोकल एसेट में कोई दिक्कत आए, तो बैकअप के लिए आपके फोन का डायरेक्ट पाथ भी चेक करेगा
       try {
         await _audioPlayer.play(DeviceFileSource('/storage/emulated/0/file file/Raju bhai.mp3'));
       } catch (_) {}
@@ -56,6 +70,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
       _msg = ''; 
       _loading = true; 
       _progress = 0.0; 
+      _errorIndicator = ''; // शुरुआत में खाली
     });
     
     await Permission.manageExternalStorage.request();
@@ -90,86 +105,78 @@ class _DownloadScreenState extends State<DownloadScreen> {
       return;
     }
 
-    try {
-      final res = await http.get(
-        Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=$id'),
-        headers: {
-          'x-rapidapi-key': '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
-          'x-rapidapi-host': 'youtube-media-downloader.p.rapidapi.com'
-        },
-      );
-      
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        String? audioLink;
-        if (data['audios'] != null && data['audios']['items'] != null && data['audios']['items'].isNotEmpty) {
-          audioLink = data['audios']['items'][0]['url'];
-        }
+    // 10 API Keys को एक-एक करके चेक करने वाला लूप
+    for (int i = 0; i < _apiKeys.length; i++) {
+      try {
+        final res = await http.get(
+          Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=$id'),
+          headers: {
+            'x-rapidapi-key': _apiKeys[i],
+            'x-rapidapi-host': 'youtube-media-downloader.p.rapidapi.com'
+          },
+        ).timeout(const Duration(seconds: 15));
         
-        if (audioLink != null) {
-          final dir = Directory('/storage/emulated/0/Raju Bhai');
-          if (!await dir.exists()) {
-            await dir.create(recursive: true);
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body);
+          String? audioLink;
+          if (data['audios'] != null && data['audios']['items'] != null && data['audios']['items'].isNotEmpty) {
+            audioLink = data['audios']['items'][0]['url'];
           }
           
-          String savePath = "${dir.path}/KC_Audio_$id.mp3";
-          
-          Dio dio = Dio();
-          
-          // स्मूथ और तेज़ डाउनलोड अनुभव के लिए प्रोग्रेस बार को बिना अटकाए तेज़ी से बढ़ाना
-          await dio.download(
-            audioLink,
-            savePath,
-            onReceiveProgress: (received, total) {
-              if (total != -1) {
-                double realProgress = received / total;
-                if (realProgress > _progress) {
-                  setState(() {
-                    _progress = realProgress;
-                  });
+          if (audioLink != null) {
+            final dir = Directory('/storage/emulated/0/Raju Bhai');
+            if (!await dir.exists()) {
+              await dir.create(recursive: true);
+            }
+            
+            String savePath = "${dir.path}/KC_Audio_$id.mp3";
+            Dio dio = Dio();
+            
+            await dio.download(
+              audioLink,
+              savePath,
+              onReceiveProgress: (received, total) {
+                if (total != -1) {
+                  double realProgress = received / total;
+                  if (realProgress > _progress) {
+                    setState(() {
+                      _progress = realProgress;
+                    });
+                  }
                 }
-              }
-            },
-          );
+              },
+            );
 
+            setState(() {
+              _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
+              _msgColor = Colors.green;
+              _progress = 1.0;
+              _loading = false;
+            });
+            
+            _playEmbeddedSuccessSound();
+            return; // डाउनलोड सफल हुआ, लूप से बाहर निकलें
+          }
+        }
+        
+        // अगर स्टेटस कोड 200 नहीं है या लिंक नहीं मिली, तो इसे फेल मानेंगे
+        throw Exception("Key Failed");
+
+      } catch (e) {
+        // की फेल होने पर ER इंडिकेटर अपडेट करें (i + 1 यानी पहली की के लिए 1)
+        setState(() {
+          _errorIndicator = 'ER: ${i + 1}';
+        });
+        
+        // अगर यह आखरी की थी और यह भी फेल हो गई
+        if (i == _apiKeys.length - 1) {
           setState(() {
-            _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
-            _msgColor = Colors.green;
-            _progress = 1.0;
-            _loading = false;
-          });
-          
-          // डाउनलोड ख़त्म होते ही राजू भाई वाला हिडन ऑडियो यहाँ ऑटोमैटिक क्लिक (ट्रिगर) होकर बज जाएगा
-          _playEmbeddedSuccessSound();
-          
-        } else {
-          setState(() {
-            _msg = 'API એરર: ઓડિયો લિંક મળી નથી.';
+            _msg = 'ડાઉનલોડ એરર: બધી કી અસફળ રહી.';
             _msgColor = Colors.red;
             _loading = false;
           });
         }
-      } else {
-        setState(() {
-          _msg = 'સર્વર રિસ્પોન્સ એરર કોડ: ${res.statusCode}';
-          _msgColor = Colors.red;
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (_progress >= 0.90) {
-        setState(() {
-          _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
-          _msgColor = Colors.green;
-          _loading = false;
-        });
-        _playEmbeddedSuccessSound();
-      } else {
-        setState(() {
-          _msg = 'ડાઉનલોડ એરર: ફરી પ્રયાસ કરો.';
-          _msgColor = Colors.red;
-          _loading = false;
-        });
+        // लूप जारी रहेगा और अगली की ट्राई होगी...
       }
     }
   }
@@ -234,15 +241,31 @@ class _DownloadScreenState extends State<DownloadScreen> {
                 ),
               ),
               const SizedBox(height: 25),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.pink, 
-                  minimumSize: const Size(double.infinity, 55), 
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
-                ),
-                onPressed: _loading ? null : _download,
-                icon: const Icon(Icons.music_note, color: Colors.white),
-                label: const Text('Download MP3', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              // डाउनलोड बटन और उसके राइट में एरर इंडिकेटर दिखाने के लिए Row का प्रयोग
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.pink, 
+                        minimumSize: const Size(double.infinity, 55), 
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
+                      ),
+                      onPressed: _loading ? null : _download,
+                      icon: const Icon(Icons.music_note, color: Colors.white),
+                      label: const Text('Download MP3', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  // बटन के राइट साइड में छोटा रेड एरर नंबर टेक्स्ट
+                  if (_errorIndicator.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: Text(
+                        _errorIndicator,
+                        style: const TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 30),
               if (_msg.isNotEmpty)
