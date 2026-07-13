@@ -39,7 +39,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
   String _statusLabel = '';
   Color _statusColor = Colors.red;
 
-  // आपकी 10 सही API कीज़ की लिस्ट
+  // आपकी 10 बिल्कुल सही और शुद्ध API कीज़
   final List<String> _apiKeys = [
     '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
     '56c7be4e11mshc2e6b844bd5ac96p13fecbjsndb1fed17bf4a',
@@ -127,13 +127,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
 
     for (int i = 0; i < _apiKeys.length; i++) {
       try {
-        if (i > 0) {
-          setState(() {
-            _statusLabel = 'ER: $i'; 
-            _statusColor = Colors.red;
-          });
-        }
-
+        // स्क्रीन को डिस्टर्ब किए बिना बैकग्राउंड में एंडपॉइंट हिट करेंगे
         final res = await http.get(
           Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/download?videoId=$id'),
           headers: {
@@ -146,7 +140,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
           final data = jsonDecode(res.body);
           String? audioLink;
           
-          // मजबूत लिंक डिटेक्शन: यह हर संभव स्ट्रक्चर से लिंक ढूंढ निकालेगा
           if (data['audios'] != null) {
             if (data['audios'] is List && data['audios'].isNotEmpty) {
               audioLink = data['audios'][0]['url'] ?? data['audios'][0]['link'];
@@ -159,7 +152,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
             }
           }
           
-          // अगर ऊपर न मिले तो डायरेक्ट बॉडी चेक करें
           audioLink ??= data['audio'] ?? data['link'] ?? data['url'];
           
           if (audioLink != null && audioLink.toString().isNotEmpty) {
@@ -199,8 +191,9 @@ class _DownloadScreenState extends State<DownloadScreen> {
             return; 
           }
         }
-        throw Exception("Key or Parse Failed");
+        throw Exception("Key Failed");
       } catch (e) {
+        // अगर आखिरी की भी फेल हो जाए, तभी F-ER स्क्रीन पर सेट होगा
         if (i == _apiKeys.length - 1) {
           setState(() {
             _msg = 'ડાઉનલોડ એરર: બધી કી અસફળ રહી.';
