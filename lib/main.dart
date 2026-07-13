@@ -39,7 +39,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
   String _statusLabel = '';
   Color _statusColor = Colors.red;
 
-  // अब सिर्फ एक ही मुख्य API की टेस्ट होगी
+  // आपकी वही मुख्य टेस्ट API की
   final String _singleApiKey = '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3';
 
   void _playEmbeddedSuccessSound() async {
@@ -115,8 +115,9 @@ class _DownloadScreenState extends State<DownloadScreen> {
     }
 
     try {
+      // यहाँ एंडपॉइंट को बदलकर बिल्कुल सही /v2/video/details कर दिया है
       final res = await http.get(
-        Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/download?videoId=$id'),
+        Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=$id'),
         headers: {
           'x-rapidapi-key': _singleApiKey,
           'x-rapidapi-host': 'youtube-media-downloader.p.rapidapi.com'
@@ -177,7 +178,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
           _playEmbeddedSuccessSound();
           return; 
         } else {
-          throw Exception("API Response format mismatch or no links found.");
+          throw Exception("API से ऑडियो लिंक नहीं मिल सका। स्ट्रक्चर बदल गया है।");
         }
       } else {
         throw Exception("Server Error: Status Code ${res.statusCode}");
