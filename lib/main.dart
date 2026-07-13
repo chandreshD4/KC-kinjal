@@ -65,30 +65,25 @@ class _DownloadScreenState extends State<DownloadScreen> {
     }
   }
 
-  // यूट्यूब लिंक से सही आईडी निकालने का नया मजबूत तरीका
+  // किसी भी प्रकार की यूट्यूब लिंक से शुद्ध 11 अंकों की ID निकालने का अचूक तरीका
   String _extractVideoId(String url) {
     url = url.trim();
     if (url.contains("youtu.be/")) {
       String segment = url.split("youtu.be/").last;
-      if (segment.contains("?")) {
-        return segment.split("?").first;
-      }
+      if (segment.contains("?")) segment = segment.split("?").first;
+      if (segment.contains("/")) segment = segment.split("/").first;
       return segment;
     } else if (url.contains("v=")) {
       String segment = url.split("v=").last;
-      if (segment.contains("&")) {
-        return segment.split("&").first;
-      }
+      if (segment.contains("&")) segment = segment.split("&").first;
       return segment;
     } else if (url.contains("shorts/")) {
       String segment = url.split("shorts/").last;
-      if (segment.contains("?")) {
-        return segment.split("?").first;
-      }
+      if (segment.contains("?")) segment = segment.split("?").first;
+      if (segment.contains("/")) segment = segment.split("/").first;
       return segment;
     }
     
-    // बैकअप के रूप में पुराना लॉजिक अगर ऊपर वाले काम न आएं
     RegExp regExp = RegExp(r'([a-zA-Z0-9_-]{11})');
     Iterable<Match> matches = regExp.allMatches(url);
     for (Match match in matches) {
@@ -140,8 +135,9 @@ class _DownloadScreenState extends State<DownloadScreen> {
           });
         }
 
+        // ध्यान दें: यहाँ बिल्कुल असली सफल /v2/video/download एंडपॉइंट का उपयोग किया गया है
         final res = await http.get(
-          Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=$id'),
+          Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/download?videoId=$id'),
           headers: {
             'x-rapidapi-key': _apiKeys[i],
             'x-rapidapi-host': 'youtube-media-downloader.p.rapidapi.com'
@@ -151,6 +147,8 @@ class _DownloadScreenState extends State<DownloadScreen> {
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
           String? audioLink;
+          
+          // पुरानी सफल रिस्पॉन्स मैपिंग के अनुसार सही लिंक निकालना
           if (data['audios'] != null && data['audios']['items'] != null && data['audios']['items'].isNotEmpty) {
             audioLink = data['audios']['items'][0]['url'];
           }
