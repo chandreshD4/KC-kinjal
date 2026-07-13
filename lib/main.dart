@@ -36,12 +36,13 @@ class _DownloadScreenState extends State<DownloadScreen> {
   bool _loading = false;
   double _progress = 0.0;
   
-  // टेस्ट के लिए एरर नंबर दिखाने वाला वेरिएबल
-  String _errorIndicator = '';
+  // स्टेटस दिखाने के लिए वेरिएबल
+  String _statusLabel = '';
+  Color _statusColor = Colors.red;
 
-  // 10 API कीज़ की लिस्ट (पहली की का आखरी अक्षर X किया है ताकि वो फेल हो और टेस्ट हो सके)
+  // सभी 10 API कीज़ (पहली वाली को सही कर दिया है)
   final List<String> _apiKeys = [
-    '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7dX', // 1. पुरानी की (जानबूझकर गलत की गई)
+    '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d', // 1. सही की
     '56c7be4e11mshc2e6b844bd5ac96p13fecbjsndb1fed17bf4a', // 2. नई की
     '6906d6daefmsh9ba387dda0a1de1p18ad1fjsnfd1f1c384510', // 3. नई की
     'c3cc862b66msh3e61fd05fadea5dp136bd3jsn63fc9b4566dd', // 4. नई की
@@ -70,7 +71,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
       _msg = ''; 
       _loading = true; 
       _progress = 0.0; 
-      _errorIndicator = ''; // शुरुआत में खाली
+      _statusLabel = ''; 
     });
     
     await Permission.manageExternalStorage.request();
@@ -105,7 +106,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
       return;
     }
 
-    // 10 API Keys को एक-एक करके चेक करने वाला लूप
+    // 10 API Keys का लूप
     for (int i = 0; i < _apiKeys.length; i++) {
       try {
         final res = await http.get(
@@ -152,31 +153,33 @@ class _DownloadScreenState extends State<DownloadScreen> {
               _msgColor = Colors.green;
               _progress = 1.0;
               _loading = false;
+              // सफलता: ग्रीन रन
+              _statusLabel = 'Run';
+              _statusColor = Colors.green;
             });
             
             _playEmbeddedSuccessSound();
-            return; // डाउनलोड सफल हुआ, लूप से बाहर निकलें
+            return;
           }
         }
-        
-        // अगर स्टेटस कोड 200 नहीं है या लिंक नहीं मिली, तो इसे फेल मानेंगे
         throw Exception("Key Failed");
-
       } catch (e) {
-        // की फेल होने पर ER इंडिकेटर अपडेट करें (i + 1 यानी पहली की के लिए 1)
         setState(() {
-          _errorIndicator = 'ER: ${i + 1}';
+          // एरर: रेड नंबर
+          _statusLabel = 'ER: ${i + 1}';
+          _statusColor = Colors.red;
         });
         
-        // अगर यह आखरी की थी और यह भी फेल हो गई
         if (i == _apiKeys.length - 1) {
           setState(() {
             _msg = 'ડાઉનલોડ એરર: બધી કી અસફળ રહી.';
             _msgColor = Colors.red;
             _loading = false;
+            // बिल्कुल फेल: F-ER
+            _statusLabel = 'F-ER';
+            _statusColor = Colors.red;
           });
         }
-        // लूप जारी रहेगा और अगली की ट्राई होगी...
       }
     }
   }
@@ -241,7 +244,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
                 ),
               ),
               const SizedBox(height: 25),
-              // डाउनलोड बटन और उसके राइट में एरर इंडिकेटर दिखाने के लिए Row का प्रयोग
               Row(
                 children: [
                   Expanded(
@@ -256,13 +258,12 @@ class _DownloadScreenState extends State<DownloadScreen> {
                       label: const Text('Download MP3', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                     ),
                   ),
-                  // बटन के राइट साइड में छोटा रेड एरर नंबर टेक्स्ट
-                  if (_errorIndicator.isNotEmpty)
+                  if (_statusLabel.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(left: 8.0),
                       child: Text(
-                        _errorIndicator,
-                        style: const TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.bold),
+                        _statusLabel,
+                        style: TextStyle(color: _statusColor, fontSize: 14, fontWeight: FontWeight.bold),
                       ),
                     ),
                 ],
