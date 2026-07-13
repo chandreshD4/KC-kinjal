@@ -36,13 +36,12 @@ class _DownloadScreenState extends State<DownloadScreen> {
   bool _loading = false;
   double _progress = 0.0;
   
-  // स्टेटस और एरर दिखाने के लिए वेरिएबल
   String _statusLabel = '';
   Color _statusColor = Colors.red;
 
-  // आपकी सभी 10 API कीज़ की सही लिस्ट
+  // आपकी बिल्कुल असली और सही 10 API कीज़
   final List<String> _apiKeys = [
-    '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d', // 1. पहली सही की
+    '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d', // 1. आपकी पहली सही की
     '56c7be4e11mshc2e6b844bd5ac96p13fecbjsndb1fed17bf4a', // 2. नई की
     '6906d6daefmsh9ba387dda0a1de1p18ad1fjsnfd1f1c384510', // 3. नई की
     'c3cc862b66msh3e61fd05fadea5dp136bd3jsn63fc9b4566dd', // 4. नई की
@@ -71,7 +70,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
       _msg = ''; 
       _loading = true; 
       _progress = 0.0; 
-      _statusLabel = ''; // शुरुआत में बिल्कुल खाली रहेगा
+      _statusLabel = ''; 
     });
     
     await Permission.manageExternalStorage.request();
@@ -106,10 +105,9 @@ class _DownloadScreenState extends State<DownloadScreen> {
       return;
     }
 
-    // 10 API Keys का लूप
     for (int i = 0; i < _apiKeys.length; i++) {
       try {
-        // अगर पहली की (i=0) फेल होकर लूप आगे बढ़ेगा, तभी ER: नंबर दिखेगा
+        // अगर पहली की फेल होकर अगली पर जाएगा तभी नंबर वाला एरर सेट होगा
         if (i > 0) {
           setState(() {
             _statusLabel = 'ER: $i'; 
@@ -117,6 +115,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
           });
         }
 
+        // आपका सही यूआरएल (youtube-media-downloader)
         final res = await http.get(
           Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=$id'),
           headers: {
@@ -161,24 +160,21 @@ class _DownloadScreenState extends State<DownloadScreen> {
               _msgColor = Colors.green;
               _progress = 1.0;
               _loading = false;
-              // सफलता मिलने पर हरे अक्षरों में Run
               _statusLabel = 'Run';
               _statusColor = Colors.green;
             });
             
             _playEmbeddedSuccessSound();
-            return; // डाउनलोड सफल होने पर बाहर निकलें
+            return; 
           }
         }
         throw Exception("Key Failed");
       } catch (e) {
-        // अगर 10वीं की भी फेल हो गई, यानी सभी फेल हो गईं
         if (i == _apiKeys.length - 1) {
           setState(() {
             _msg = 'ડાઉનલોડ એરર: બધી કી અસફળ રહી.';
             _msgColor = Colors.red;
             _loading = false;
-            // सभी फेल होने पर लाल अक्षरों में F-ER
             _statusLabel = 'F-ER';
             _statusColor = Colors.red;
           });
