@@ -39,18 +39,18 @@ class _DownloadScreenState extends State<DownloadScreen> {
   String _statusLabel = '';
   Color _statusColor = Colors.red;
 
-  // आपकी बिल्कुल असली और सही 10 API कीज़
+  // आपकी दी हुई बिल्कुल सही 10 API कीज़ की लिस्ट
   final List<String> _apiKeys = [
-    '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d', // 1. आपकी पहली सही की
-    '56c7be4e11mshc2e6b844bd5ac96p13fecbjsndb1fed17bf4a', // 2. नई की
-    '6906d6daefmsh9ba387dda0a1de1p18ad1fjsnfd1f1c384510', // 3. नई की
-    'c3cc862b66msh3e61fd05fadea5dp136bd3jsn63fc9b4566dd', // 4. नई की
-    '8439a37d89msh4c70f081f5f1d90p19bcecjsn123e5abcf25f', // 5. नई की
-    '1a4b97a95cmsh63119b201c78c23p1ca86cjsnc46a1e2d735d', // 6. नई की
-    '38c1d62c4cmsh9d4bb1e235f76fap1b1367jsnc7189c1883d2', // 7. नई की
-    'e1ba887686msh8b0d392e439e4c4p14de4djsn54bf1674261b', // 8. नई की
-    '73e7f04058mshb08f095390e591ap15c478jsn0302e4b31bfc', // 9. नई की
-    '57e13dd96amsh82abf541e085d9ap1e2a55jsn70db8a26c985', // 10. नई की
+    '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
+    '56c7be4e11mshc2e6b844bd5ac96p13fecbjsndb1fed17bf4a',
+    '6906d6daefmsh9ba387dda0a1de1p18ad1fjsnfd1f1c384510',
+    'c3cc862b66msh3e61fd05fadea5dp136bd3jsn63fc9b4566dd',
+    '8439a37d89msh4c70f081f5f1d90p19bcecjsn123e5abcf25f',
+    '1a4b97a95cmsh63119b201c78c23p1ca86cjsnc46a1e2d735d',
+    '38c1d62c4cmsh9d4bb1e235f76fap1b1367jsnc7189c1883d2',
+    'e1ba887686msh8b0d392e439e4c4p14de4djsn54bf1674261b',
+    '73e7f04058mshb08f095390e591ap15c478jsn0302e4b31bfc',
+    '57e13dd96amsh82abf541e085d9ap1e2a55jsn70db8a26c985'
   ];
 
   void _playEmbeddedSuccessSound() async {
@@ -107,7 +107,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
 
     for (int i = 0; i < _apiKeys.length; i++) {
       try {
-        // अगर पहली की फेल होकर अगली पर जाएगा तभी नंबर वाला एरर सेट होगा
+        // पहली की (i=0) फेल होने के बाद ही स्क्रीन पर ER: 1, 2... सेट होगा
         if (i > 0) {
           setState(() {
             _statusLabel = 'ER: $i'; 
@@ -115,7 +115,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
           });
         }
 
-        // आपका सही यूआरएल (youtube-media-downloader)
         final res = await http.get(
           Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=$id'),
           headers: {
