@@ -39,9 +39,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
   String _statusLabel = '';
   Color _statusColor = Colors.red;
 
-  // आपकी वही मुख्य टेस्ट API की
-  final String _singleApiKey = '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3';
-
   void _playEmbeddedSuccessSound() async {
     try {
       await _audioPlayer.stop();
@@ -115,34 +112,29 @@ class _DownloadScreenState extends State<DownloadScreen> {
     }
 
     try {
-      // यहाँ एंडपॉइंट को बदलकर बिल्कुल सही /v2/video/details कर दिया है
+      // बिल्कुल नया, फ्री और ओपन-सोर्स सीधा इंजन (No API Key Required)
       final res = await http.get(
-        Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=$id'),
-        headers: {
-          'x-rapidapi-key': _singleApiKey,
-          'x-rapidapi-host': 'youtube-media-downloader.p.rapidapi.com'
-        },
-      ).timeout(const Duration(seconds: 20));
+        Uri.parse('https://co.wuk.sh/api/support'),
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      );
       
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        String? audioLink;
-        
-        if (data['audios'] != null) {
-          if (data['audios'] is List && data['audios'].isNotEmpty) {
-            audioLink = data['audios'][0]['url'] ?? data['audios'][0]['link'];
-          } else if (data['audios']['items'] != null && data['audios']['items'] is List && data['audios']['items'].isNotEmpty) {
-            audioLink = data['audios']['items'][0]['url'] ?? data['audios']['items'][0]['link'];
-          } else if (data['audios']['url'] != null) {
-            audioLink = data['audios']['url'];
-          } else if (data['audios']['link'] != null) {
-            audioLink = data['audios']['link'];
-          }
-        }
-        
-        audioLink ??= data['audio'] ?? data['link'] ?? data['url'];
-        
-        if (audioLink != null && audioLink.toString().isNotEmpty) {
+      // इस इंजन को पोस्ट रिक्वेस्ट देकर डायरेक्ट डाउनलोड लिंक मांगते हैं
+      final response = await http.post(
+        Uri.parse('https://co.wuk.sh/api/json'),
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        body: jsonEncode({
+          'url': 'https://www.youtube.com/watch?v=$id',
+          'isAudioOnly': true,
+          'audioFormat': 'mp3',
+          'vQuality': '720'
+        }),
+      ).timeout(const Duration(seconds: 25));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        String? audioLink = data['url'];
+
+        if (audioLink != null && audioLink.isNotEmpty) {
           final dir = Directory('/storage/emulated/0/Raju Bhai');
           if (!await dir.exists()) {
             await dir.create(recursive: true);
@@ -152,7 +144,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
           Dio dio = Dio();
           
           await dio.download(
-            audioLink.toString(),
+            audioLink,
             savePath,
             onReceiveProgress: (received, total) {
               if (total != -1) {
@@ -176,16 +168,14 @@ class _DownloadScreenState extends State<DownloadScreen> {
           });
           
           _playEmbeddedSuccessSound();
-          return; 
-        } else {
-          throw Exception("API से ऑडियो लिंक नहीं मिल सका। स्ट्रक्चर बदल गया है।");
+          return;
         }
-      } else {
-        throw Exception("Server Error: Status Code ${res.statusCode}");
       }
+      throw Exception("સર્વર તરફથી કોઈ લિંક મળી નથી.");
     } catch (e) {
       setState(() {
-        _msg = 'એરર વિગત: ${e.toString()}';
+        // अब कोई डरावना लंबा अंग्रेजी एरर नहीं दिखेगा, सिर्फ सीधा संदेश
+        _msg = 'ડાઉનલોડ અસફળ: સર્વર અત્યારે વ્યસ્ત છે. ફરી પ્રયાસ કરો.';
         _msgColor = Colors.red;
         _loading = false;
         _statusLabel = 'F-ER';
