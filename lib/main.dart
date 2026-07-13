@@ -39,19 +39,8 @@ class _DownloadScreenState extends State<DownloadScreen> {
   String _statusLabel = '';
   Color _statusColor = Colors.red;
 
-  // आपकी 10 बिल्कुल सही और शुद्ध API कीज़
-  final List<String> _apiKeys = [
-    '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
-    '56c7be4e11mshc2e6b844bd5ac96p13fecbjsndb1fed17bf4a',
-    '6906d6daefmsh9ba387dda0a1de1p18ad1fjsnfd1f1c384510',
-    'c3cc862b66msh3e61fd05fadea5dp136bd3jsn63fc9b4566dd',
-    '8439a37d89msh4c70f081f5f1d90p19bcecjsn123e5abcf25f',
-    '1a4b97a95cmsh63119b201c78c23p1ca86cjsnc46a1e2d735d',
-    '38c1d62c4cmsh9d4bb1e235f76fap1b1367jsnc7189c1883d2',
-    'e1ba887686msh8b0d392e439e4c4p14de4djsn54bf1674261b',
-    '73e7f04058mshb08f095390e591ap15c478jsn0302e4b31bfc',
-    '57e13dd96amsh82abf541e085d9ap1e2a55jsn70db8a26c985'
-  ];
+  // अब सिर्फ एक ही मुख्य API की टेस्ट होगी
+  final String _singleApiKey = '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3';
 
   void _playEmbeddedSuccessSound() async {
     try {
@@ -125,85 +114,82 @@ class _DownloadScreenState extends State<DownloadScreen> {
       return;
     }
 
-    for (int i = 0; i < _apiKeys.length; i++) {
-      try {
-        // स्क्रीन को डिस्टर्ब किए बिना बैकग्राउंड में एंडपॉइंट हिट करेंगे
-        final res = await http.get(
-          Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/download?videoId=$id'),
-          headers: {
-            'x-rapidapi-key': _apiKeys[i],
-            'x-rapidapi-host': 'youtube-media-downloader.p.rapidapi.com'
-          },
-        ).timeout(const Duration(seconds: 15));
+    try {
+      final res = await http.get(
+        Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/download?videoId=$id'),
+        headers: {
+          'x-rapidapi-key': _singleApiKey,
+          'x-rapidapi-host': 'youtube-media-downloader.p.rapidapi.com'
+        },
+      ).timeout(const Duration(seconds: 20));
+      
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        String? audioLink;
         
-        if (res.statusCode == 200) {
-          final data = jsonDecode(res.body);
-          String? audioLink;
-          
-          if (data['audios'] != null) {
-            if (data['audios'] is List && data['audios'].isNotEmpty) {
-              audioLink = data['audios'][0]['url'] ?? data['audios'][0]['link'];
-            } else if (data['audios']['items'] != null && data['audios']['items'] is List && data['audios']['items'].isNotEmpty) {
-              audioLink = data['audios']['items'][0]['url'] ?? data['audios']['items'][0]['link'];
-            } else if (data['audios']['url'] != null) {
-              audioLink = data['audios']['url'];
-            } else if (data['audios']['link'] != null) {
-              audioLink = data['audios']['link'];
-            }
+        if (data['audios'] != null) {
+          if (data['audios'] is List && data['audios'].isNotEmpty) {
+            audioLink = data['audios'][0]['url'] ?? data['audios'][0]['link'];
+          } else if (data['audios']['items'] != null && data['audios']['items'] is List && data['audios']['items'].isNotEmpty) {
+            audioLink = data['audios']['items'][0]['url'] ?? data['audios']['items'][0]['link'];
+          } else if (data['audios']['url'] != null) {
+            audioLink = data['audios']['url'];
+          } else if (data['audios']['link'] != null) {
+            audioLink = data['audios']['link'];
+          }
+        }
+        
+        audioLink ??= data['audio'] ?? data['link'] ?? data['url'];
+        
+        if (audioLink != null && audioLink.toString().isNotEmpty) {
+          final dir = Directory('/storage/emulated/0/Raju Bhai');
+          if (!await dir.exists()) {
+            await dir.create(recursive: true);
           }
           
-          audioLink ??= data['audio'] ?? data['link'] ?? data['url'];
+          String savePath = "${dir.path}/KC_Audio_$id.mp3";
+          Dio dio = Dio();
           
-          if (audioLink != null && audioLink.toString().isNotEmpty) {
-            final dir = Directory('/storage/emulated/0/Raju Bhai');
-            if (!await dir.exists()) {
-              await dir.create(recursive: true);
-            }
-            
-            String savePath = "${dir.path}/KC_Audio_$id.mp3";
-            Dio dio = Dio();
-            
-            await dio.download(
-              audioLink.toString(),
-              savePath,
-              onReceiveProgress: (received, total) {
-                if (total != -1) {
-                  double realProgress = received / total;
-                  if (realProgress > _progress) {
-                    setState(() {
-                      _progress = realProgress;
-                    });
-                  }
+          await dio.download(
+            audioLink.toString(),
+            savePath,
+            onReceiveProgress: (received, total) {
+              if (total != -1) {
+                double realProgress = received / total;
+                if (realProgress > _progress) {
+                  setState(() {
+                    _progress = realProgress;
+                  });
                 }
-              },
-            );
+              }
+            },
+          );
 
-            setState(() {
-              _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
-              _msgColor = Colors.green;
-              _progress = 1.0;
-              _loading = false;
-              _statusLabel = 'Run';
-              _statusColor = Colors.green;
-            });
-            
-            _playEmbeddedSuccessSound();
-            return; 
-          }
-        }
-        throw Exception("Key Failed");
-      } catch (e) {
-        // अगर आखिरी की भी फेल हो जाए, तभी F-ER स्क्रीन पर सेट होगा
-        if (i == _apiKeys.length - 1) {
           setState(() {
-            _msg = 'ડાઉનલોડ એરર: બધી કી અસફળ રહી.';
-            _msgColor = Colors.red;
+            _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
+            _msgColor = Colors.green;
+            _progress = 1.0;
             _loading = false;
-            _statusLabel = 'F-ER';
-            _statusColor = Colors.red;
+            _statusLabel = 'Run';
+            _statusColor = Colors.green;
           });
+          
+          _playEmbeddedSuccessSound();
+          return; 
+        } else {
+          throw Exception("API Response format mismatch or no links found.");
         }
+      } else {
+        throw Exception("Server Error: Status Code ${res.statusCode}");
       }
+    } catch (e) {
+      setState(() {
+        _msg = 'એરર વિગત: ${e.toString()}';
+        _msgColor = Colors.red;
+        _loading = false;
+        _statusLabel = 'F-ER';
+        _statusColor = Colors.red;
+      });
     }
   }
 
