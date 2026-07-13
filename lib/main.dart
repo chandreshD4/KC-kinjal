@@ -39,7 +39,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
   String _statusLabel = '';
   Color _statusColor = Colors.red;
 
-  // आपकी दी हुई बिल्कुल सही 10 API कीज़ की लिस्ट
+  // आपकी बिल्कुल सही 10 API कीज़ की लिस्ट
   final List<String> _apiKeys = [
     '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
     '56c7be4e11mshc2e6b844bd5ac96p13fecbjsndb1fed17bf4a',
@@ -65,6 +65,41 @@ class _DownloadScreenState extends State<DownloadScreen> {
     }
   }
 
+  // यूट्यूब लिंक से सही आईडी निकालने का नया मजबूत तरीका
+  String _extractVideoId(String url) {
+    url = url.trim();
+    if (url.contains("youtu.be/")) {
+      String segment = url.split("youtu.be/").last;
+      if (segment.contains("?")) {
+        return segment.split("?").first;
+      }
+      return segment;
+    } else if (url.contains("v=")) {
+      String segment = url.split("v=").last;
+      if (segment.contains("&")) {
+        return segment.split("&").first;
+      }
+      return segment;
+    } else if (url.contains("shorts/")) {
+      String segment = url.split("shorts/").last;
+      if (segment.contains("?")) {
+        return segment.split("?").first;
+      }
+      return segment;
+    }
+    
+    // बैकअप के रूप में पुराना लॉजिक अगर ऊपर वाले काम न आएं
+    RegExp regExp = RegExp(r'([a-zA-Z0-9_-]{11})');
+    Iterable<Match> matches = regExp.allMatches(url);
+    for (Match match in matches) {
+      String possibleId = match.group(0)!;
+      if (possibleId != 'youtu' && possibleId != 'watch') {
+        return possibleId;
+      }
+    }
+    return '';
+  }
+
   Future<void> _download() async {
     setState(() { 
       _msg = ''; 
@@ -85,16 +120,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
       return;
     }
 
-    String id = '';
-    RegExp regExp = RegExp(r'([a-zA-Z0-9_-]{11})');
-    Iterable<Match> matches = regExp.allMatches(url);
-    for (Match match in matches) {
-      String possibleId = match.group(0)!;
-      if (possibleId != 'youtu' && possibleId != 'watch') {
-        id = possibleId;
-        break;
-      }
-    }
+    String id = _extractVideoId(url);
 
     if (id.isEmpty || id.length != 11) {
       setState(() { 
@@ -107,7 +133,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
 
     for (int i = 0; i < _apiKeys.length; i++) {
       try {
-        // पहली की (i=0) फेल होने के बाद ही स्क्रीन पर ER: 1, 2... सेट होगा
         if (i > 0) {
           setState(() {
             _statusLabel = 'ER: $i'; 
