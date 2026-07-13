@@ -39,7 +39,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
   String _statusLabel = '';
   Color _statusColor = Colors.red;
 
-  // आपकी बिल्कुल सही 10 API कीज़ की लिस्ट
+  // आपकी 10 सही API कीज़ की लिस्ट
   final List<String> _apiKeys = [
     '2a2d800e5cmsh0798dd20ef51d17p1d9715jsn2c69b2d0f7d3',
     '56c7be4e11mshc2e6b844bd5ac96p13fecbjsndb1fed17bf4a',
@@ -65,7 +65,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
     }
   }
 
-  // किसी भी प्रकार की यूट्यूब लिंक से शुद्ध 11 अंकों की ID निकालने का अचूक तरीका
   String _extractVideoId(String url) {
     url = url.trim();
     if (url.contains("youtu.be/")) {
@@ -135,7 +134,6 @@ class _DownloadScreenState extends State<DownloadScreen> {
           });
         }
 
-        // ध्यान दें: यहाँ बिल्कुल असली सफल /v2/video/download एंडपॉइंट का उपयोग किया गया है
         final res = await http.get(
           Uri.parse('https://youtube-media-downloader.p.rapidapi.com/v2/video/download?videoId=$id'),
           headers: {
@@ -148,12 +146,23 @@ class _DownloadScreenState extends State<DownloadScreen> {
           final data = jsonDecode(res.body);
           String? audioLink;
           
-          // पुरानी सफल रिस्पॉन्स मैपिंग के अनुसार सही लिंक निकालना
-          if (data['audios'] != null && data['audios']['items'] != null && data['audios']['items'].isNotEmpty) {
-            audioLink = data['audios']['items'][0]['url'];
+          // मजबूत लिंक डिटेक्शन: यह हर संभव स्ट्रक्चर से लिंक ढूंढ निकालेगा
+          if (data['audios'] != null) {
+            if (data['audios'] is List && data['audios'].isNotEmpty) {
+              audioLink = data['audios'][0]['url'] ?? data['audios'][0]['link'];
+            } else if (data['audios']['items'] != null && data['audios']['items'] is List && data['audios']['items'].isNotEmpty) {
+              audioLink = data['audios']['items'][0]['url'] ?? data['audios']['items'][0]['link'];
+            } else if (data['audios']['url'] != null) {
+              audioLink = data['audios']['url'];
+            } else if (data['audios']['link'] != null) {
+              audioLink = data['audios']['link'];
+            }
           }
           
-          if (audioLink != null) {
+          // अगर ऊपर न मिले तो डायरेक्ट बॉडी चेक करें
+          audioLink ??= data['audio'] ?? data['link'] ?? data['url'];
+          
+          if (audioLink != null && audioLink.toString().isNotEmpty) {
             final dir = Directory('/storage/emulated/0/Raju Bhai');
             if (!await dir.exists()) {
               await dir.create(recursive: true);
@@ -163,7 +172,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
             Dio dio = Dio();
             
             await dio.download(
-              audioLink,
+              audioLink.toString(),
               savePath,
               onReceiveProgress: (received, total) {
                 if (total != -1) {
@@ -190,7 +199,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
             return; 
           }
         }
-        throw Exception("Key Failed");
+        throw Exception("Key or Parse Failed");
       } catch (e) {
         if (i == _apiKeys.length - 1) {
           setState(() {
