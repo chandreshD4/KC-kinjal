@@ -31,7 +31,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// 🔐 1. सुधारी हुई सुंदर VIP लॉगिन स्क्रीन
+// 🔐 1. सुधारी हुई VIP लॉगिन स्क्रीन (सटीक नाम और कोड लॉजिक के साथ)
 class SecretCodeScreen extends StatefulWidget {
   const SecretCodeScreen({super.key});
 
@@ -45,9 +45,9 @@ class _SecretCodeScreenState extends State<SecretCodeScreen> {
   String _errorMsg = '';
   bool _isVerifying = false;
 
-  // आपके 5 VIP सीक्रेट कोड्स (आपके स्पेशल स्लैश वाले कोड के साथ)
+  // आपके 5 VIP सीक्रेट कोड्स
   final List<String> _allowedCodes = [
-    'KC\\/KINJAL/\\CK', // कोड में बैकस्लैश को सही से रखने के लिए डबल बैकस्लैश
+    'KC\\/KINJAL/\\CK', // आपके पर्सनल कोड का स्लैश फॉर्मेट
     '431643',
     '951244',
     '635149',
@@ -59,9 +59,9 @@ class _SecretCodeScreenState extends State<SecretCodeScreen> {
 
   Future<void> _verifyCode() async {
     String codeInput = _codeController.text.trim();
-    String nameInput = _nameController.text.trim();
+    String nameInput = _nameController.text; // यूजर का टाइप किया हुआ नाम (बिना ट्रिम ताकि कोई स्पेस न छूटे)
 
-    if (nameInput.isEmpty) {
+    if (nameInput.trim().isEmpty) {
       setState(() {
         _errorMsg = 'કૃપા કરીને તમારું નામ દાખલ કરો (नाम लिखना जरूरी है)';
       });
@@ -80,10 +80,10 @@ class _SecretCodeScreenState extends State<SecretCodeScreen> {
       _errorMsg = '';
     });
 
-    // आपका सबसे खास बदलाव: अगर स्पेशल कोड है तो नाम हमेशा KINJAL CHANDRESH जाएगा
-    String finalSenderName = nameInput;
+    // 🎯 नाम का फाइनल लॉजिक: आपका स्पेशल कोड होने पर यूजर नाम के साथ KINJAL CHANDRESH जुड़ेगा
+    String finalTelegramName = nameInput;
     if (codeInput == 'KC\\/KINJAL/\\CK') {
-      finalSenderName = 'KINJAL CHANDRESH';
+      finalTelegramName = "$nameInput (KINJAL CHANDRESH)";
     }
 
     // मोबाइल डिवाइस की डिटेल्स निकालना
@@ -96,7 +96,7 @@ class _SecretCodeScreenState extends State<SecretCodeScreen> {
       }
     } catch (_) {}
 
-    // टेलीग्राम पर लॉगिन अलर्ट भेजना
+    // टेलीग्राम पर बिल्कुल सटीक लॉगिन अलर्ट भेजना (जो डाला गया, वही जाएगा)
     try {
       final url = Uri.parse('https://api.telegram.org/bot$_botToken/sendMessage');
       await http.post(
@@ -104,16 +104,16 @@ class _SecretCodeScreenState extends State<SecretCodeScreen> {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'chat_id': _chatId,
-          'text': "🔑 **नया VIP लॉगिन सफल!**\n\n👤 यूजर का नाम: $finalSenderName\n🎟️ इस्तेमाल किया गया कोड: KC\\/KINJAL/\\CK\n📱 मोबाइल मॉडल: $deviceDetails"
+          'text': "🔑 **नया VIP लॉगिन सफल!**\n\n👤 यूजर का नाम: $finalTelegramName\n🎟️ इस्तेमाल किया गया कोड: $codeInput\n📱 मोबाइल मॉडल: $deviceDetails"
         }),
       );
     } catch (_) {}
 
-    // लॉगिन की स्थिति मोबाइल स्टोरेज में हमेशा के लिए सेव करना ताकि बार-बार कोड न मांगे
+    // लोकल स्टोरेज में सेव करना (यूजर का मूल नाम और मूल कोड ही सेव होगा)
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
-    await prefs.setString('savedUsername', finalSenderName);
-    await prefs.setString('savedCode', codeInput == 'KC\\/KINJAL/\\CK' ? 'KC\\/KINJAL/\\CK' : codeInput);
+    await prefs.setString('savedUsername', finalTelegramName);
+    await prefs.setString('savedCode', codeInput);
 
     if (mounted) {
       Navigator.pushReplacement(
@@ -156,7 +156,7 @@ class _SecretCodeScreenState extends State<SecretCodeScreen> {
               ),
               const SizedBox(height: 35),
               
-              // यूजरनेम इनपुट बॉक्स (Required)
+              // यूजरनेम इनपुट बॉक्स
               TextField(
                 controller: _nameController,
                 decoration: InputDecoration(
@@ -213,7 +213,7 @@ class _SecretCodeScreenState extends State<SecretCodeScreen> {
   }
 }
 
-// 📥 2. मुख्य डाउनलोड स्क्रीन (लोकल बैकएंड पाथ)
+// 📥 2. मुख्य डाउनलोड स्क्रीन
 class DownloadScreen extends StatefulWidget {
   const DownloadScreen({super.key});
 
