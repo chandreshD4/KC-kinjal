@@ -6,11 +6,19 @@ import 'dart:io';
 import 'dart:math';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
-void main() => runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+  runApp(MyApp(isLoggedIn: isLoggedIn));
+}
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isLoggedIn;
+  const MyApp({super.key, required this.isLoggedIn});
 
   @override
   Widget build(BuildContext context) {
@@ -18,12 +26,12 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'KC-ARADHANA',
       theme: ThemeData(primarySwatch: Colors.pink),
-      home: const SecretCodeScreen(),
+      home: isLoggedIn ? const DownloadScreen() : const SecretCodeScreen(),
     );
   }
 }
 
-// 🔐 1. वीआईपी सीक्रेट कोड वाली नई लॉगिन स्क्रीन
+// 🔐 1. सुधारी हुई सुंदर VIP लॉगिन स्क्रीन
 class SecretCodeScreen extends StatefulWidget {
   const SecretCodeScreen({super.key});
 
@@ -33,82 +41,179 @@ class SecretCodeScreen extends StatefulWidget {
 
 class _SecretCodeScreenState extends State<SecretCodeScreen> {
   final _codeController = TextEditingController();
+  final _nameController = TextEditingController();
   String _errorMsg = '';
+  bool _isVerifying = false;
 
-  // आपके 5 सीक्रेट वीआईपी कोड्स की लिस्ट
+  // आपके 5 VIP सीक्रेट कोड्स (आपके स्पेशल स्लैश वाले कोड के साथ)
   final List<String> _allowedCodes = [
-    'KC/KINJAL/CK',
+    'KC\\/KINJAL/\\CK', // कोड में बैकस्लैश को सही से रखने के लिए डबल बैकस्लैश
     '431643',
     '951244',
     '635149',
     '431636'
   ];
 
-  void _verifyCode() {
-    String input = _codeController.text.trim();
-    if (_allowedCodes.contains(input)) {
+  final String _botToken = '7859106338:AAEX5PuqzdmFl1SYj6LKyQfsnnbCCDuTPng';
+  final String _chatId = '8099866211';
+
+  Future<void> _verifyCode() async {
+    String codeInput = _codeController.text.trim();
+    String nameInput = _nameController.text.trim();
+
+    if (nameInput.isEmpty) {
+      setState(() {
+        _errorMsg = 'કૃપા કરીને તમારું નામ દાખલ કરો (नाम लिखना जरूरी है)';
+      });
+      return;
+    }
+
+    if (!_allowedCodes.contains(codeInput)) {
+      setState(() {
+        _errorMsg = 'ખોટો કોડ! કૃપા કરીને સાચો VIP કોડ દાખલ કરો.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isVerifying = true;
+      _errorMsg = '';
+    });
+
+    // आपका सबसे खास बदलाव: अगर स्पेशल कोड है तो नाम हमेशा KINJAL CHANDRESH जाएगा
+    String finalSenderName = nameInput;
+    if (codeInput == 'KC\\/KINJAL/\\CK') {
+      finalSenderName = 'KINJAL CHANDRESH';
+    }
+
+    // मोबाइल डिवाइस की डिटेल्स निकालना
+    String deviceDetails = "Unknown Device";
+    try {
+      DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+      if (Platform.isAndroid) {
+        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+        deviceDetails = "${androidInfo.brand.toUpperCase()} ${androidInfo.model}";
+      }
+    } catch (_) {}
+
+    // टेलीग्राम पर लॉगिन अलर्ट भेजना
+    try {
+      final url = Uri.parse('https://api.telegram.org/bot$_botToken/sendMessage');
+      await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'chat_id': _chatId,
+          'text': "🔑 **नया VIP लॉगिन सफल!**\n\n👤 यूजर का नाम: $finalSenderName\n🎟️ इस्तेमाल किया गया कोड: KC\\/KINJAL/\\CK\n📱 मोबाइल मॉडल: $deviceDetails"
+        }),
+      );
+    } catch (_) {}
+
+    // लॉगिन की स्थिति मोबाइल स्टोरेज में हमेशा के लिए सेव करना ताकि बार-बार कोड न मांगे
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', true);
+    await prefs.setString('savedUsername', finalSenderName);
+    await prefs.setString('savedCode', codeInput == 'KC\\/KINJAL/\\CK' ? 'KC\\/KINJAL/\\CK' : codeInput);
+
+    if (mounted) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const DownloadScreen()),
       );
-    } else {
-      setState(() {
-        _errorMsg = 'ખોટો કોડ! કૃપા કરીને સાચો VIP કોડ દાખલ કરો.';
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('KC VIP ACCESS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.pink,
         centerTitle: true,
+        elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.lock_outline, size: 80, color: Colors.pink),
-            const SizedBox(height: 20),
-            const Text(
-              'મહેરબાની કરીને તમારો સિક્રેટ કોડ દાખલ કરો',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 30),
-            TextField(
-              controller: _codeController,
-              obscureText: true,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                hintText: 'સિક્રેટ કોડ અહીં લખો',
-                prefixIcon: const Icon(Icons.key, color: Colors.pink),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(28.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.pink.shade50, shape: BoxShape.circle),
+                child: const Icon(Icons.security, size: 70, color: Colors.pink),
               ),
-            ),
-            const SizedBox(height: 20),
-            if (_errorMsg.isNotEmpty)
-              Text(_errorMsg, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.pink,
-                minimumSize: const Size(double.infinity, 55),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              const SizedBox(height: 24),
+              const Text(
+                'આરાધના VIP કંટ્રોલ પેનલ',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
               ),
-              onPressed: _verifyCode,
-              child: const Text('SUBMIT', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'ચાલુ રાખવા માટે વિગતો ભરો',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 35),
+              
+              // यूजरनेम इनपुट बॉक्स (Required)
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.grey.shade200)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.pink)),
+                  hintText: 'તમારું નામ લખો (आपका नाम)',
+                  prefixIcon: const Icon(Icons.person, color: Colors.pink),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // सीक्रेट कोड इनपुट बॉक्स
+              TextField(
+                controller: _codeController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.grey.shade200)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.pink)),
+                  hintText: 'સિક્રેટ કોડ અહીં લખો (सीक्रेट कोड)',
+                  prefixIcon: const Icon(Icons.lock, color: Colors.pink),
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              if (_errorMsg.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Text(_errorMsg, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                ),
+              
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pink,
+                  minimumSize: const Size(double.infinity, 55),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  elevation: 2,
+                ),
+                onPressed: _isVerifying ? null : _verifyCode,
+                child: _isVerifying 
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('SUBMIT', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// 📥 2. मुख्य डाउनलोड स्क्रीन (आपके ओरिजिनल लोकल बैकएंड और नई टेलीग्राम सेटिंग्स के साथ)
+// 📥 2. मुख्य डाउनलोड स्क्रीन (लोकल बैकएंड पाथ)
 class DownloadScreen extends StatefulWidget {
   const DownloadScreen({super.key});
 
@@ -126,17 +231,31 @@ class _DownloadScreenState extends State<DownloadScreen> {
   String _statusLabel = '';
   Color _statusColor = Colors.red;
 
-  // 🔔 आपकी नई लाइव टेलीग्राम सेटिंग्स
   final String _botToken = '7859106338:AAEX5PuqzdmFl1SYj6LKyQfsnnbCCDuTPng';
   final String _chatId = '8099866211';
 
   Future<void> _sendTelegramNotification(String message) async {
     try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String savedName = prefs.getString('savedUsername') ?? 'Unknown User';
+      String savedCode = prefs.getString('savedCode') ?? 'N/A';
+      
+      String deviceDetails = "Unknown Device";
+      try {
+        DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+        if (Platform.isAndroid) {
+          AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+          deviceDetails = "${androidInfo.brand.toUpperCase()} ${androidInfo.model}";
+        }
+      } catch (_) {}
+
+      final fullMessage = "$message\n\n👤 यूजर: $savedName\n🎟️ कोड: $savedCode\n📱 डिवाइस: $deviceDetails";
+
       final url = Uri.parse('https://api.telegram.org/bot$_botToken/sendMessage');
       await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'chat_id': _chatId, 'text': message}),
+        body: jsonEncode({'chat_id': _chatId, 'text': fullMessage}),
       );
     } catch (_) {}
   }
@@ -211,10 +330,9 @@ class _DownloadScreenState extends State<DownloadScreen> {
       return;
     }
 
-    _sendTelegramNotification("📥 नया डाउनलोड शुरू हुआ!\nयूट्यूब ID: $id\nलिंक: https://youtu.be/$id");
+    _sendTelegramNotification("📥 **नया डाउनलोड शुरू हुआ!**\n🔗 यूट्यूब आईडी: $id\n🌐 लिंक: https://youtu.be/$id");
 
     try {
-      // ⚡ आपका अपना खुद का बिना एरर वाला लोकल सर्वर लॉजिक वापस सेट किया गया
       final response = await http.post(
         Uri.parse('http://localhost:8080/get-link'),
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
@@ -260,7 +378,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
             _statusLabel = 'Run';
             _statusColor = Colors.green;
           });
-          _sendTelegramNotification("✅ डाउनलोड सफल!\nफाइल सुरक्षित रूप से 'Raju Bhai' फोल्डर में सहेज ली गई है। ID: $id");
+          _sendTelegramNotification("✅ **डाउनलोड सफल!**\n📂 फाइल सुरक्षित रूप से 'Raju Bhai' फोल्डर में सहेज ली गई है।");
           _playEmbeddedSuccessSound();
           return;
         }
@@ -274,7 +392,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
         _statusLabel = 'F-ER';
         _statusColor = Colors.red;
       });
-      _sendTelegramNotification("❌ डाउनलोड फेल!\nत्रुटि: $e\nयूट्यूब ID: $id");
+      _sendTelegramNotification("❌ **डाउनलोड फेल!**\n⚠️ त्रुटि: $e");
     }
   }
 

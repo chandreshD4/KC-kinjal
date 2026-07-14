@@ -24,3 +24,7 @@ flutter:
   assets:
     - assets/profile.png
     - assets/raju_bhai.mp3
+
+dependencies:
+  shared_preferences: ^2.2.0
+  device_info_plus: ^10.1.0
