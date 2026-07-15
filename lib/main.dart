@@ -11,7 +11,6 @@ import 'package:device_info_plus/device_info_plus.dart';
 
 const String TELEGRAM_BOT_TOKEN = "7859106338:AAEX5PuqzdmFl1SYj6LKyQfsnnbCCDuTPng";
 const String TELEGRAM_CHAT_ID = "8099866211";
-// यहाँ चाबी को पूरी तरह खाली कर दिया है ताकि गिटहब कभी ब्लॉक न करे
 const String GEMINI_API_KEY = String.fromEnvironment('GEMINI_KEY', defaultValue: '');
 
 void main() async {
@@ -394,6 +393,7 @@ class _MainScreenState extends State<MainScreen> {
         final downloadUrl = data['url'];
 
         if (downloadUrl != null) {
+          // यहाँ हमने एंड्रॉइड डायरेक्टरी पाथ को फिक्स किया है ताकि सीधा 'Raju Bhai' फ़ोल्डर में डाउनलोड हो सके
           Directory externalDir = Directory('/storage/emulated/0/Raju Bhai');
           if (!await externalDir.exists()) {
             await externalDir.create(recursive: true);

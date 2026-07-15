@@ -2,10 +2,8 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
   build:
@@ -24,32 +22,20 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.19.6'
           channel: 'stable'
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Force Create Android Folder & Configure SDKs
+      - name: Generate App Icons
         run: |
-          # 1. प्रोजेक्ट का नाम ठीक रखते हुए एंड्रॉइड फ़ोल्डर बनाएं
-          flutter create --project-name=kc_kinjal --platforms=android .
-          
-          # 2. कोटलिन वर्जन को 1.9.20 पर सेट करें
-          if [ -f "android/build.gradle" ]; then
-            sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '1.9.20'/g" android/build.gradle
-          fi
-          
-          # 3. minSdkVersion को 19 से बढ़ाकर 21 करें ताकि माइक फीचर काम कर सके
-          if [ -f "android/app/build.gradle" ]; then
-            sed -i "s/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g" android/app/build.gradle
-            sed -i "s/minSdkVersion 19/minSdkVersion 21/g" android/app/build.gradle
-          fi
+          flutter pub run flutter_launcher_icons:main || true
 
-      - name: Build Release APK
-        run: flutter build apk --release
+      - name: Build APK
+        run: flutter build apk --release --dart-define=GEMINI_KEY="${{ secrets.GEMINI_KEY }}"
 
-      - name: Upload Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
