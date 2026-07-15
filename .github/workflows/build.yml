@@ -24,7 +24,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0' # नया और एकदम स्टेबल फ्लटर वर्जन
+          flutter-version: '3.19.0' # अब 3.19.0 का जादू चलेगा
           channel: 'stable'
 
       - name: Install dependencies
