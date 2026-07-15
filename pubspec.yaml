@@ -16,10 +16,11 @@ dependencies:
   audioplayers: ^5.2.1
   shared_preferences: ^2.2.0
   device_info_plus: ^10.1.0
-  # यहाँ हमने एरर को जड़ से खत्म करने के लिए स्टेबल वर्जन डाला है
+  # त्रुटियों को जड़ से खत्म करने के लिए एकदम स्टेबल वर्जन
   camera: 0.10.6
-  google_mlkit_object_detection: ^0.11.0
-  flutter_tts: ^4.0.2
+  flutter_tts: 3.8.5
+  speech_to_text: ^6.6.0
+  google_generative_ai: ^0.2.0
 
 dev_dependencies:
   flutter_test:

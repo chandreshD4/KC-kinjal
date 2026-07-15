@@ -44,6 +44,11 @@ jobs:
         run: flutter pub get
 
       - name: Build New Release APK
+      - name: Force Kotlin 1.9.20
+        run: |
+          flutter create --platforms=android .
+          sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '1.9.20'/g" android/build.gradle
+
         run: flutter build apk --release
 
       - uses: actions/upload-artifact@v4
