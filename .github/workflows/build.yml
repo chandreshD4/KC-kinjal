@@ -24,7 +24,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0' # अब 3.19.0 का जादू चलेगा
+          flutter-version: '3.19.0'
           channel: 'stable'
 
       - name: Install dependencies
@@ -32,7 +32,8 @@ jobs:
 
       - name: Force Create Android Folder & Kotlin 1.9.20
         run: |
-          flutter create --platforms=android .
+          # प्रोजेक्ट का नाम छोटे अक्षरों में निर्दिष्ट करके एंड्रॉइड फोल्डर बनाएं
+          flutter create --project-name=kc_kinjal --platforms=android .
           if [ -f "android/build.gradle" ]; then
             sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '1.9.20'/g" android/build.gradle
           fi
