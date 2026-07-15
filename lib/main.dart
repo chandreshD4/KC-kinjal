@@ -24,7 +24,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'KC-ARADHANA',
+      title: 'KC Aradhana',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.pink,
@@ -50,23 +50,14 @@ class _PermissionGateState extends State<PermissionGate> {
   }
 
   Future<void> _requestAllPermissions() async {
-    // कैमरा और माइक्रोफोन परमिशन
     await Permission.camera.request();
     await Permission.microphone.request();
 
     if (Platform.isAndroid) {
-      final androidInfo = await DeviceInfoPlugin().androidInfo;
-      final sdkInt = androidInfo.version.sdkInt;
-
-      if (sdkInt >= 30) {
-        // एंड्रॉइड 11+ के लिए "All Files Access" (Manage External Storage) परमिशन
-        var status = await Permission.manageExternalStorage.status;
-        if (!status.isGranted) {
-          await Permission.manageExternalStorage.request();
-        }
-      } else {
-        // पुराने एंड्रॉइड वर्जन्स के लिए सामान्य स्टोरेज परमिशन
-        await Permission.storage.request();
+      var status = await Permission.manageExternalStorage.status;
+      if (!status.isGranted) {
+        // सीधा सिस्टम की "All files access" स्क्रीन पर रीडायरेक्ट करेगा
+        await Permission.manageExternalStorage.request();
       }
     }
 
@@ -114,7 +105,6 @@ class _AuthCheckState extends State<AuthCheck> {
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final savedCode = prefs.getString('savedCode') ?? '';
 
-    // अगर पहले से लॉग-इन है, तो सीधा मेन स्क्रीन पर भेजें (लॉग-इन पेज बाईपास होगा)
     if (isLoggedIn && savedCode.isNotEmpty) {
       if (mounted) {
         Navigator.pushAndRemoveUntil(
@@ -158,16 +148,13 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<String> _getDeviceModel() async {
     try {
       DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-      if (Platform.isAndroid) {
-        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        return "${androidInfo.manufacturer} ${androidInfo.model} (Android ${androidInfo.version.release})";
-      }
+      AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+      return "${androidInfo.manufacturer} ${androidInfo.model} (Android ${androidInfo.version.release})";
     } catch (_) {}
-    return "Unknown Android Device";
+    return "Unknown Device";
   }
 
   Future<void> sendTelegramNotification(String name, String code) async {
-    // नाम का नया लॉजिक जो आपने समझाया है
     String displayName = name;
     if (code == "KC/KINJAL/CK") {
       displayName = "$name (KINJAL CHANDRESH)";
@@ -368,24 +355,12 @@ class _MainScreenState extends State<MainScreen> {
       return;
     }
 
-    // डाउनलोड शुरू करने से पहले पक्का करें कि Manage External Storage परमिशन मिली हुई है
-    if (Platform.isAndroid) {
-      final androidInfo = await DeviceInfoPlugin().androidInfo;
-      if (androidInfo.version.sdkInt >= 30) {
-        var status = await Permission.manageExternalStorage.status;
-        if (!status.isGranted) {
-          setState(() => _statusMessage = "ડાઉનલોડ કરવા માટે સ્ટોરેજ પરવાનગી જરૂરી છે!");
-          await Permission.manageExternalStorage.request();
-          return;
-        }
-      } else {
-        var status = await Permission.storage.status;
-        if (!status.isGranted) {
-          setState(() => _statusMessage = "ડાઉનલોડ કરવા માટે સ્ટોરેજ પરવાનગી જરૂરી છે!");
-          await Permission.storage.request();
-          return;
-        }
-      }
+    // अगर परमिशन नहीं है, तो ऑल फाइल्स परमिशन स्क्रीन खोलें
+    var status = await Permission.manageExternalStorage.status;
+    if (!status.isGranted) {
+      setState(() => _statusMessage = "ડાઉનલોડ કરવા માટે સ્ટોરેજ પરવાનગી જરૂરી છે!");
+      await Permission.manageExternalStorage.request();
+      return;
     }
 
     setState(() {
@@ -407,7 +382,6 @@ class _MainScreenState extends State<MainScreen> {
         final downloadUrl = data['url'];
 
         if (downloadUrl != null) {
-          // 'Raju Bhai' फ़ोल्डर को इंटरनल स्टोरेज की रूट डायरेक्टरी में बनाना
           Directory externalDir = Directory('/storage/emulated/0/Raju Bhai');
           if (!await externalDir.exists()) {
             await externalDir.create(recursive: true);
@@ -428,7 +402,7 @@ class _MainScreenState extends State<MainScreen> {
           throw "ડાઉનલોડ લિંક મળી નથી.";
         }
       } else {
-        throw "સર્વર રિસ્પોન્સ એરર કોડ: ${response.statusCode}";
+        throw "સર્વર રિસ્પોન્સ એરર కోડ: ${response.statusCode}";
       }
     } catch (e) {
       setState(() {
@@ -491,7 +465,7 @@ class _MainScreenState extends State<MainScreen> {
                     Navigator.push(context, MaterialPageRoute(builder: (context) => const AICameraScreen()));
                   },
                   icon: const Icon(Icons.camera_alt, color: Colors.white),
-                  label: const Text("Ai KC-Camera", style: TextStyle(color: Colors.white, fontSize: 18)), // बटन का नाम बदला गया
+                  label: const Text("Ai KC-Camera", style: TextStyle(color: Colors.white, fontSize: 18)),
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                 ),
               ),
@@ -517,7 +491,8 @@ class _AICameraScreenState extends State<AICameraScreen> {
   late FlutterTts _flutterTts;
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
-  String _aiResponseText = "કોઈપણ વસ્તુની સામે કેમેરો રાખી નીચે આપેલ બટન દબાવો...";
+  String _aiResponseText = "લાઈવ વિશ્લેષણ ચાલુ છે...";
+  Timer? _analysisTimer;
 
   @override
   void initState() {
@@ -536,22 +511,29 @@ class _AICameraScreenState extends State<AICameraScreen> {
     final cameras = await availableCameras();
     if (cameras.isEmpty) return;
 
-    _cameraController = CameraController(cameras.first, ResolutionPreset.high, enableAudio: false);
+    _cameraController = CameraController(cameras.first, ResolutionPreset.medium, enableAudio: false);
 
     try {
       await _cameraController!.initialize();
       if (mounted) {
         setState(() => _isCameraInitialized = true);
+        
+        // कैमरा खुलते ही सबसे पहले एक बार स्वागत संदेश बोलेगा
+        await _flutterTts.speak("મને ચંદ્રેશ ભાઈએ બનાવ્યા છે.");
+
+        // हर 5 सेकंड में बिना किसी बटन के अपने-आप फोटो कैप्चर करके जेमिनी को भेजेगा
+        _analysisTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+          _detectObjectAutomatically();
+        });
       }
     } catch (_) {}
   }
 
-  Future<void> _detectObjectNow() async {
+  Future<void> _detectObjectAutomatically() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized || _isProcessing) return;
 
     setState(() {
       _isProcessing = true;
-      _aiResponseText = "વિશ્લેષણ ચાલી રહ્યું છે...";
     });
 
     try {
@@ -581,31 +563,31 @@ class _AICameraScreenState extends State<AICameraScreen> {
             }
           ]
         })
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final String textResponse = data['candidates'][0]['content']['parts'][0]['text'] ?? "વસ્તુ ઓળખી શકાઈ નથી.";
+        final String textResponse = data['candidates'][0]['content']['parts'][0]['text'] ?? "";
         
-        setState(() {
-          _aiResponseText = textResponse.trim();
-        });
-        await _flutterTts.speak(_aiResponseText);
-      } else {
-        throw "સર્વર ભૂલ";
+        if (textResponse.trim().isNotEmpty) {
+          setState(() {
+            _aiResponseText = textResponse.trim();
+          });
+          await _flutterTts.speak(_aiResponseText);
+        }
       }
-    } catch (e) {
-      setState(() {
-        _aiResponseText = "કનેક્શન અસફળ રહ્યું.";
-      });
-      await _flutterTts.speak("કૃપા કરીને ઇન્ટરનેટ ચાલુ કરો.");
+    } catch (_) {
+      // बैकग्राउंड में आ रहे एरर्स को शांत रखें ताकि यूजर को कोई रुकावट महसूस न हो
     } finally {
-      setState(() => _isProcessing = false);
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
   @override
   void dispose() {
+    _analysisTimer?.cancel();
     _cameraController?.dispose();
     _flutterTts.stop();
     super.dispose();
@@ -623,31 +605,28 @@ class _AICameraScreenState extends State<AICameraScreen> {
             bottom: 30,
             left: 20,
             right: 20,
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(12)),
-                  child: Text(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(12)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
                     _aiResponseText, 
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 16)
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
                   ),
-                ),
-                const SizedBox(height: 15),
-                SizedBox(
-                  width: 220,
-                  height: 60,
-                  child: ElevatedButton.icon(
-                    onPressed: _isProcessing ? null : _detectObjectNow,
-                    icon: _isProcessing 
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Icon(Icons.psychology, color: Colors.white, size: 28),
-                    label: const Text("ડિટેક્ટ કરો", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, shape: const StadiumBorder()),
-                  ),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.teal)),
+                      SizedBox(width: 10),
+                      Text("લાઈવ ઓટો-ડિટેક્ટ ચાલુ છે...", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    ],
+                  )
+                ],
+              ),
             ),
           )
         ],
