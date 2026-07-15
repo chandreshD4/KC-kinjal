@@ -1,209 +1,187 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
+import 'package:camera/camera.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
+
+List<CameraDescription> cameras = [];
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-  runApp(MyApp(isLoggedIn: isLoggedIn));
+  try {
+    cameras = await availableCameras();
+  } catch (e) {
+    print("Camera error: $e");
+  }
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final bool isLoggedIn;
-  const MyApp({super.key, required this.isLoggedIn});
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'KC ARADHANA',
+      theme: ThemeData(
+        primarySwatch: Colors.pink,
+      ),
+      home: const LoginScreen(),
       debugShowCheckedModeBanner: false,
-      title: 'KC-ARADHANA',
-      theme: ThemeData(primarySwatch: Colors.pink),
-      home: isLoggedIn ? const DownloadScreen() : const SecretCodeScreen(),
     );
   }
 }
 
-// 🔐 1. सुधारी हुई VIP लॉगिन स्क्रीन (सटीक नाम और कोड लॉजिक के साथ)
-class SecretCodeScreen extends StatefulWidget {
-  const SecretCodeScreen({super.key});
+// ------------------- LOGIN SCREEN -------------------
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
 
   @override
-  State<SecretCodeScreen> createState() => _SecretCodeScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _SecretCodeScreenState extends State<SecretCodeScreen> {
-  final _codeController = TextEditingController();
-  final _nameController = TextEditingController();
-  String _errorMsg = '';
-  bool _isVerifying = false;
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
+  bool _isLoading = false;
 
-  // आपके 5 VIP सीक्रेट कोड्स
-  final List<String> _allowedCodes = [
-    'KC\\/KINJAL/\\CK', // आपके पर्सनल कोड का स्लैश फॉर्मेट
-    '431643',
-    '951244',
-    '635149',
-    '431636'
-  ];
+  final String botToken = "7759882200:AAEqSveXW33U7L7eC2rB9SjKz3p6bCg2m_k"; 
+  final String chatId = "5630325492";
 
-  final String _botToken = '7859106338:AAEX5PuqzdmFl1SYj6LKyQfsnnbCCDuTPng';
-  final String _chatId = '8099866211';
-
-  Future<void> _verifyCode() async {
-    String codeInput = _codeController.text.trim();
-    String nameInput = _nameController.text; // यूजर का टाइप किया हुआ नाम (बिना ट्रिम ताकि कोई स्पेस न छूटे)
-
-    if (nameInput.trim().isEmpty) {
-      setState(() {
-        _errorMsg = 'કૃપા કરીને તમારું નામ દાખલ કરો (नाम लिखना जरूरी है)';
-      });
-      return;
-    }
-
-    if (!_allowedCodes.contains(codeInput)) {
-      setState(() {
-        _errorMsg = 'ખોટો કોડ! કૃપા કરીને સાચો VIP કોડ દાખલ કરો.';
-      });
-      return;
-    }
-
-    setState(() {
-      _isVerifying = true;
-      _errorMsg = '';
-    });
-
-    // 🎯 नाम का फाइनल लॉजिक: आपका स्पेशल कोड होने पर यूजर नाम के साथ KINJAL CHANDRESH जुड़ेगा
-    String finalTelegramName = nameInput;
-    if (codeInput == 'KC\\/KINJAL/\\CK') {
-      finalTelegramName = "$nameInput (KINJAL CHANDRESH)";
-    }
-
-    // मोबाइल डिवाइस की डिटेल्स निकालना
-    String deviceDetails = "Unknown Device";
+  Future<void> sendTelegramMessage(String message) async {
+    final url = Uri.parse("https://api.telegram.org/bot$botToken/sendMessage");
     try {
-      DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-      if (Platform.isAndroid) {
-        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        deviceDetails = "${androidInfo.brand.toUpperCase()} ${androidInfo.model}";
-      }
-    } catch (_) {}
-
-    // टेलीग्राम पर बिल्कुल सटीक लॉगिन अलर्ट भेजना (जो डाला गया, वही जाएगा)
-    try {
-      final url = Uri.parse('https://api.telegram.org/bot$_botToken/sendMessage');
       await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'chat_id': _chatId,
-          'text': "🔑 **नया VIP लॉगिन सफल!**\n\n👤 यूजर का नाम: $finalTelegramName\n🎟️ इस्तेमाल किया गया कोड: $codeInput\n📱 मोबाइल मॉडल: $deviceDetails"
-        }),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"chat_id": chatId, "text": message}),
       );
-    } catch (_) {}
+    } catch (e) {
+      print("Telegram Error: $e");
+    }
+  }
 
-    // लोकल स्टोरेज में सेव करना (यूजर का मूल नाम और मूल कोड ही सेव होगा)
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isLoggedIn', true);
-    await prefs.setString('savedUsername', finalTelegramName);
-    await prefs.setString('savedCode', codeInput);
+  Future<String> getDeviceModel() async {
+    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+    if (Platform.isAndroid) {
+      AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+      return androidInfo.model;
+    }
+    return "Unknown Device";
+  }
 
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DownloadScreen()),
+  void _handleLogin() async {
+    String name = _nameController.text.trim();
+    String code = _codeController.text.trim();
+
+    if (name.isEmpty || code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("કૃપા કરીને બધી વિગતો ભરો (कृपया पूरी जानकारी भरें)")),
+      );
+      return;
+    }
+
+    setState(() { _isLoading = true; });
+
+    if (code == "KC\\KINJAL/\\CK" || code == "635149") {
+      String customName = (code == "KC\\KINJAL/\\CK") ? "KINJAL CHANDRESH" : name;
+      
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', customName);
+      await prefs.setString('user_code', code);
+
+      String deviceModel = await getDeviceModel();
+
+      String telegramMsg = "🔑 **नया VIP लॉगिन सफल!** 🔑\n\n"
+          "👤 यूजर का नाम: $customName\n"
+          "🎟️ इस्तेमाल किया गया कोड: $code\n"
+          "📱 मोबाइल मॉडल: $deviceModel";
+
+      await sendTelegramMessage(telegramMsg);
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DownloadScreen()),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("ખોટો સિક્રેટ કોડ! (गलत सीक्रेट कोड!)")),
       );
     }
+
+    setState(() { _isLoading = false; });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('KC VIP ACCESS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text("KC VIP ACCESS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.pink,
         centerTitle: true,
-        elevation: 0,
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28.0),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.pink.shade50, shape: BoxShape.circle),
-                child: const Icon(Icons.security, size: 70, color: Colors.pink),
+              const SizedBox(height: 50),
+              const CircleAvatar(
+                radius: 60,
+                backgroundColor: Color(#FFF1F3),
+                child: Icon(Icons.security, size: 70, color: Colors.pink),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 30),
               const Text(
-                'આરાધના VIP કંટ્રોલ પેનલ',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                "આરાધના VIP કંટ્રોલ પેનલ",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
               ),
               const SizedBox(height: 8),
-              Text(
-                'ચાલુ રાખવા માટે વિગતો ભરો',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              const Text(
+                "ચાલુ રાખવા માટે વિગતો ભરો",
+                style: TextStyle(fontSize: 16, color: Colors.black54),
               ),
-              const SizedBox(height: 35),
-              
-              // यूजरनेम इनपुट बॉक्स
+              const SizedBox(height: 40),
               TextField(
                 controller: _nameController,
                 decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.grey.shade200)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.pink)),
-                  hintText: 'તમારું નામ લખો (आपका नाम)',
                   prefixIcon: const Icon(Icons.person, color: Colors.pink),
+                  labelText: "તમારું નામ લખો (आपका नाम)",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 16),
-              
-              // सीक्रेट कोड इनपुट बॉक्स
+              const SizedBox(height: 20),
               TextField(
                 controller: _codeController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.grey.shade200)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.pink)),
-                  hintText: 'સિક્રેટ કોડ અહીં લખો (सीक्रेट कोड)',
                   prefixIcon: const Icon(Icons.lock, color: Colors.pink),
+                  labelText: "સિક્રેટ કોડ અહીં લખો (સીક્રેટ કોડ)",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 20),
-              
-              if (_errorMsg.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16.0),
-                  child: Text(_errorMsg, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _handleLogin,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.pink,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text("SUBMIT", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
-              
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.pink,
-                  minimumSize: const Size(double.infinity, 55),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  elevation: 2,
-                ),
-                onPressed: _isVerifying ? null : _verifyCode,
-                child: _isVerifying 
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('SUBMIT', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -213,7 +191,7 @@ class _SecretCodeScreenState extends State<SecretCodeScreen> {
   }
 }
 
-// 📥 2. मुख्य डाउनलोड स्क्रीन
+// ------------------- DOWNLOAD SCREEN -------------------
 class DownloadScreen extends StatefulWidget {
   const DownloadScreen({super.key});
 
@@ -222,331 +200,393 @@ class DownloadScreen extends StatefulWidget {
 }
 
 class _DownloadScreenState extends State<DownloadScreen> {
-  final _urlController = TextEditingController();
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  String _msg = '';
-  Color _msgColor = Colors.red;
-  bool _loading = false;
-  double _progress = 0.0;
-  String _statusLabel = '';
-  Color _statusColor = Colors.red;
+  final TextEditingController _urlController = TextEditingController();
+  bool _isDownloading = false;
+  String _statusMessage = "";
+  String userName = "";
+  String userCode = "";
 
-  final String _botToken = '7859106338:AAEX5PuqzdmFl1SYj6LKyQfsnnbCCDuTPng';
-  final String _chatId = '8099866211';
+  final String botToken = "7759882200:AAEqSveXW33U7L7eC2rB9SjKz3p6bCg2m_k"; 
+  final String chatId = "5630325492";
 
-  Future<void> _sendTelegramNotification(String message) async {
+  @override
+  void initState() {
+    super.initState();
+    _loadUserInfo();
+  }
+
+  void _loadUserInfo() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userName = prefs.getString('user_name') ?? "Guest";
+      userCode = prefs.getString('user_code') ?? "Unknown";
+    });
+  }
+
+  Future<void> sendTelegramMessage(String message) async {
+    final url = Uri.parse("https://api.telegram.org/bot$botToken/sendMessage");
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String savedName = prefs.getString('savedUsername') ?? 'Unknown User';
-      String savedCode = prefs.getString('savedCode') ?? 'N/A';
-      
-      String deviceDetails = "Unknown Device";
-      try {
-        DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-        if (Platform.isAndroid) {
-          AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-          deviceDetails = "${androidInfo.brand.toUpperCase()} ${androidInfo.model}";
-        }
-      } catch (_) {}
-
-      final fullMessage = "$message\n\n👤 यूजर: $savedName\n🎟️ कोड: $savedCode\n📱 डिवाइस: $deviceDetails";
-
-      final url = Uri.parse('https://api.telegram.org/bot$_botToken/sendMessage');
       await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'chat_id': _chatId, 'text': fullMessage}),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"chat_id": chatId, "text": message}),
       );
-    } catch (_) {}
-  }
-
-  void _playEmbeddedSuccessSound() async {
-    try {
-      await _audioPlayer.stop();
-      await _audioPlayer.setVolume(1.0);
-      await _audioPlayer.play(AssetSource('raju_bhai.mp3'), mode: PlayerMode.lowLatency);
     } catch (e) {
-      try {
-        await _audioPlayer.play(DeviceFileSource('/storage/emulated/0/file file/Raju bhai.mp3'));
-      } catch (_) {}
+      print("Telegram Error: $e");
     }
   }
 
-  String _extractVideoId(String url) {
-    url = url.trim();
-    if (url.contains("youtu.be/")) {
-      String segment = url.split("youtu.be/").last;
-      if (segment.contains("?")) segment = segment.split("?").first;
-      if (segment.contains("/")) segment = segment.split("/").first;
-      return segment;
-    } else if (url.contains("v=")) {
-      String segment = url.split("v=").last;
-      if (segment.contains("&")) segment = segment.split("&").first;
-      return segment;
-    } else if (url.contains("shorts/")) {
-      String segment = url.split("shorts/").last;
-      if (segment.contains("?")) segment = segment.split("?").first;
-      if (segment.contains("/")) segment = segment.split("/").first;
-      return segment;
+  Future<void> _startDownload() async {
+    String videoUrl = _urlController.text.trim();
+    if (videoUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("કૃપા કરીને લિંક દાખલ કરો (कृपया लिंक डालें)")),
+      );
+      return;
     }
-    RegExp regExp = RegExp(r'([a-zA-Z0-9_-]{11})');
-    Iterable<Match> matches = regExp.allMatches(url);
-    for (Match match in matches) {
-      String possibleId = match.group(0)!;
-      if (possibleId != 'youtu' && possibleId != 'watch') {
-        return possibleId;
-      }
-    }
-    return '';
-  }
 
-  Future<void> _download() async {
     setState(() {
-      _msg = '';
-      _loading = true;
-      _progress = 0.0;
-      _statusLabel = '';
+      _isDownloading = true;
+      _statusMessage = "ડાઉનલોડ શરૂ થઈ રહ્યું છે... (डाउनलोड शुरू हो रहा है...)";
     });
 
-    await Permission.manageExternalStorage.request();
-    String url = _urlController.text.trim();
-
-    if (url.isEmpty) {
-      setState(() {
-        _msg = 'કૃપા કરીને લિંક પેસ્ટ કરો';
-        _msgColor = Colors.red;
-        _loading = false;
-      });
-      return;
+    String videoId = "";
+    if (videoUrl.contains("youtu.be/")) {
+      videoId = videoUrl.split("youtu.be/")[1].split("?")[0];
+    } else if (videoUrl.contains("v=")) {
+      videoId = videoUrl.split("v=")[1].split("&")[0];
+    } else {
+      videoId = videoUrl;
     }
 
-    String id = _extractVideoId(url);
-    if (id.isEmpty || id.length != 11) {
-      setState(() {
-        _msg = 'ખોટી લિંક: આઈડી મળી નથી.';
-        _msgColor = Colors.red;
-        _loading = false;
-      });
-      return;
-    }
-
-    _sendTelegramNotification("📥 **नया डाउनलोड शुरू हुआ!**\n🔗 यूट्यूब आईडी: $id\n🌐 लिंक: https://youtu.be/$id");
+    String startMsg = "📥 **नया डाउनलोड शुरू हुआ!** 📥\n\n"
+        "🔗 यूट्यूब आईडी: $videoId\n"
+        "🌐 लिंक: https://youtu.be/$videoId\n"
+        "👤 यूजर: $userName\n"
+        "🎟️ कोड: $userCode\n"
+        "📱 डिवाइस: OPPO CPH2325";
+    await sendTelegramMessage(startMsg);
 
     try {
-      final response = await http.post(
-        Uri.parse('http://localhost:8080/get-link'),
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-        body: jsonEncode({
-          'url': 'https://www.youtube.com/watch?v=$id',
-          'format_type': 'audio'
-        }),
-      ).timeout(const Duration(seconds: 45));
-
+      // बैकएंड डाउनलोडर API को रिक्वेस्ट भेजें
+      final response = await http.get(Uri.parse("http://localhost:8080/get-link?id=$videoId"));
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        String? audioLink = data['download_url'];
-
-        if (audioLink != null && audioLink.isNotEmpty) {
-          final dir = Directory('/storage/emulated/0/Raju Bhai');
-          if (!await dir.exists()) {
-            await dir.create(recursive: true);
+        String downloadUrl = response.body.trim();
+        
+        // फाइल सुरक्षित करने का लॉजिक (जैसा राजू भाई फोल्डर में था)
+        var status = await Permission.storage.request();
+        if (status.isGranted) {
+          final directory = Directory('/storage/emulated/0/Raju Bhai');
+          if (!await directory.exists()) {
+            await directory.create(recursive: true);
           }
-
-          String savePath = "${dir.path}/KC_Audio_$id.mp3";
-          Dio dio = Dio();
-
-          await dio.download(
-            audioLink,
-            savePath,
-            onReceiveProgress: (received, total) {
-              if (total != -1) {
-                double realProgress = received / total;
-                if (realProgress > _progress) {
-                  setState(() {
-                    _progress = realProgress;
-                  });
-                }
-              }
-            },
-          );
+          
+          final filePath = "${directory.path}/KC_Audio_$videoId.mp3";
+          final fileResponse = await http.get(Uri.parse(downloadUrl));
+          final file = File(filePath);
+          await file.writeAsBytes(fileResponse.bodyBytes);
 
           setState(() {
-            _msg = 'સફળતા! ઓડિયો Raju Bhai ફોલ્ડરમાં સેવ થયો.';
-            _msgColor = Colors.green;
-            _progress = 1.0;
-            _loading = false;
-            _statusLabel = 'Run';
-            _statusColor = Colors.green;
+            _statusMessage = "ડાઉનલોડ સફળ! ફાઇલ 'Raju Bhai' માં સાચવેલ છે.";
           });
-          _sendTelegramNotification("✅ **डाउनलोड सफल!**\n📂 फाइल सुरक्षित रूप से 'Raju Bhai' फोल्डर में सहेज ली गई है।");
-          _playEmbeddedSuccessSound();
-          return;
+
+          String successMsg = "✅ **डाउनलोड सफल!** ✅\n"
+              "📁 फाइल सुरक्षित रूप से 'Raju Bhai' फोल्डर में सहेज ली गई है।\n"
+              "👤 यूजर: $userName\n"
+              "🎟️ कोड: $userCode\n"
+              "📱 डिवाइस: OPPO CPH2325";
+          await sendTelegramMessage(successMsg);
+        } else {
+          setState(() {
+            _statusMessage = "સ્ટોરેજ પરવાનગી નકારી કાઢી (स्टोरेज परमिशन नहीं मिली)";
+          });
         }
+      } else {
+        setState(() {
+          _statusMessage = "ભૂલ: ડાઉનલોડ લિંક મળી નથી (एरर: लिंक नहीं मिला)";
+        });
       }
-      throw Exception("સર્વર તરફથી કોઈ લિંક મળી નથી.");
     } catch (e) {
       setState(() {
-        _msg = 'ડાઉનલોડ અસફળ: સર્વર અત્યારે વ્યસ્ત છે. ફરી પ્રયાસ કરો.';
-        _msgColor = Colors.red;
-        _loading = false;
-        _statusLabel = 'F-ER';
-        _statusColor = Colors.red;
+        _statusMessage = "કનેક્શન ભૂલ (कनेक्शन एरर): $e";
       });
-      _sendTelegramNotification("❌ **डाउनलोड फेल!**\n⚠️ त्रुटि: $e");
     }
+
+    setState(() { _isDownloading = false; });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Welcome to KC-ARADHANA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text("Welcome to KC-ARADHANA", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.pink,
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-              Center(
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox(
-                      width: 206,
-                      height: 206,
-                      child: CustomPaint(
-                        painter: MultiColorProgressPainter(progress: _loading ? _progress : 0.0),
-                      ),
-                    ),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(100),
-                      child: Image.asset(
-                        'assets/profile.png',
-                        width: 180,
-                        height: 180,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_circle, size: 180, color: Colors.grey),
-                      ),
-                    ),
-                    if (_loading)
-                      Container(
-                        width: 180,
-                        height: 180,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.4),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Center(
-                          child: Text(
-                            "${(_progress * 100).toStringAsFixed(0)}%",
-                            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                  ],
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            CircleAvatar(
+              radius: 90,
+              backgroundImage: const AssetImage('assets/profile.png'),
+              backgroundColor: Colors.grey[200],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              "આરાધના MP3 Downloader VIP",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 30),
+            TextField(
+              controller: _urlController,
+              decoration: InputDecoration(
+                hintText: "યૂટ્યૂબ લિંક અહીં પેસ્ટ કરો",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _isDownloading ? null : _startDownload,
+                icon: const Icon(Icons.music_note, color: Colors.white),
+                label: const Text("Download MP3", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pink,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 20),
-              const Text('આરાધના MP3 Downloader VIP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 30),
-              TextField(
-                controller: _urlController,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                  hintText: 'યૂટ્યૂબ લિંક અહીં પેસ્ટ કરો',
+            ),
+            const SizedBox(height: 20),
+            // ---- नया AI कैमरा बटन ----
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => CameraScreen(userName: userName, userCode: userCode)),
+                  );
+                },
+                icon: const Icon(Icons.camera_alt, color: Colors.white),
+                label: const Text("AI Camera (વસ્તુ ઓળખો)", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 25),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.pink,
-                        minimumSize: const Size(double.infinity, 55),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      ),
-                      onPressed: _loading ? null : _download,
-                      icon: const Icon(Icons.music_note, color: Colors.white),
-                      label: const Text('Download MP3', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                  if (_statusLabel.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8.0),
-                      child: Text(
-                        _statusLabel,
-                        style: TextStyle(color: _statusColor, fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 30),
-              if (_msg.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    _msg,
-                    style: TextStyle(color: _msgColor, fontSize: 16, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 20),
+            Text(_statusMessage, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal)),
+          ],
         ),
       ),
     );
   }
 }
 
-class MultiColorProgressPainter extends CustomPainter {
-  final double progress;
-  MultiColorProgressPainter({required this.progress});
+// ------------------- NEW AI CAMERA SCREEN -------------------
+class CameraScreen extends StatefulWidget {
+  final String userName;
+  final String userCode;
+  const CameraScreen({super.key, required this.userName, required this.userCode});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    Offset center = Offset(size.width / 2, size.height / 2);
-    double radius = min(size.width / 2, size.height / 2) - 4;
-    Paint bgPaint = Paint()
-      ..color = Colors.grey.shade200
-      ..strokeWidth = 7
-      ..style = PaintingStyle.stroke;
+  State<CameraScreen> createState() => _CameraScreenState();
+}
 
-    canvas.drawCircle(center, radius, bgPaint);
-    double totalAngle = progress * 2 * pi;
-    double startAngle = -pi / 2;
-    List<Color> colors = [
-      Colors.pink.shade700,
-      Colors.green.shade700,
-      Colors.red.shade700,
-      Colors.black87,
-    ];
+class _CameraScreenState extends State<CameraScreen> {
+  CameraController? _cameraController;
+  bool _isCameraInitialized = false;
+  ObjectDetector? _objectDetector;
+  final FlutterTts _flutterTts = FlutterTts();
+  String _detectedText = "સામે જુઓ... (सामने देखें...)";
+  bool _isProcessing = false;
+  String lastSpoken = "";
 
-    for (int i = 0; i < 4; i++) {
-      if (totalAngle <= i * (pi / 2)) break;
-      double sweepAngle = totalAngle - (i * (pi / 2));
-      if (sweepAngle > pi / 2) sweepAngle = pi / 2;
-      Paint progressPaint = Paint()
-        ..color = colors[i]
-        ..strokeWidth = 7
-        ..strokeCap = StrokeCap.round
-        ..style = PaintingStyle.stroke;
+  final String botToken = "7759882200:AAEqSveXW33U7L7eC2rB9SjKz3p6bCg2m_k"; 
+  final String chatId = "5630325492";
 
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle + (i * (pi / 2)),
-        sweepAngle,
-        false,
-        progressPaint,
+  @override
+  void initState() {
+    super.initState();
+    _initializeCameraAndAI();
+    _sendTelegramAlert("🔔 **कैमरा फीचर चालू किया गया!**\n👤 यूजर: ${widget.userName}\n🎟️ कोड: ${widget.userCode}");
+  }
+
+  Future<void> _sendTelegramAlert(String message) async {
+    final url = Uri.parse("https://api.telegram.org/bot$botToken/sendMessage");
+    try {
+      await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"chat_id": chatId, "text": message}),
       );
+    } catch (e) {
+      print("Telegram Log Error: $e");
     }
   }
 
+  void _initializeCameraAndAI() async {
+    var status = await Permission.camera.request();
+    if (!status.isGranted) {
+      setState(() { _detectedText = "કેમેરા પરવાનગી જરૂરી છે (कैमरा परमिशन चाहिए)"; });
+      return;
+    }
+
+    if (cameras.isEmpty) {
+      setState(() { _detectedText = "કોઈ કેમેરા મળ્યો નથી (कैमरा नहीं मिला)"; });
+      return;
+    }
+
+    _cameraController = CameraController(cameras[0], ResolutionPreset.medium, enableAudio: false);
+    await _cameraController!.initialize();
+
+    // लोकल डिवाइस ऑब्जेक्ट डिटेक्शन सेट करें (पूरी तरह ऑफलाइन और मुफ्त)
+    final options = ObjectDetectorOptions(
+      mode: DetectionMode.stream,
+      classifyObjects: true,
+      multipleObjects: false,
+    );
+    _objectDetector = ObjectDetector(options: options);
+
+    _cameraController!.startImageStream((CameraImage image) {
+      if (_isProcessing) return;
+      _isProcessing = true;
+      _processCameraImage(image);
+    });
+
+    setState(() { _isCameraInitialized = true; });
+  }
+
+  void _processCameraImage(CameraImage image) async {
+    try {
+      final WriteBuffer allBytes = WriteBuffer();
+      for (final Plane plane in image.planes) {
+        allBytes.putUint8List(plane.bytes);
+      }
+      final bytes = allBytes.done().buffer.asUint8List();
+
+      final Size imageSize = Size(image.width.toDouble(), image.height.toDouble());
+      final InputImageRotation imageRotation = InputImageRotation.rotation90deg;
+      final InputImageFormat inputImageFormat = InputImageFormatValue.fromRawValue(image.format.raw) ?? InputImageFormat.nv21;
+
+      final inputImageMetadata = InputImageMetadata(
+        size: imageSize,
+        rotation: imageRotation,
+        format: inputImageFormat,
+        bytesPerRow: image.planes[0].bytesPerRow,
+      );
+
+      final inputImage = InputImage.fromBytes(bytes: bytes, metadata: inputImageMetadata);
+      final List<DetectedObject> objects = await _objectDetector!.processImage(inputImage);
+
+      if (objects.isNotEmpty) {
+        final firstObject = objects.first;
+        if (firstObject.labels.isNotEmpty) {
+          String englishName = firstObject.labels.first.text;
+          String hindiName = _translateToHindi(englishName);
+          
+          setState(() {
+            _detectedText = hindiName;
+          });
+
+          if (lastSpoken != hindiName) {
+            lastSpoken = hindiName;
+            await _flutterTts.speak(hindiName);
+          }
+        }
+      }
+    } catch (e) {
+      print("Processing Error: $e");
+    } finally {
+      _isProcessing = false;
+    }
+  }
+
+  // वस्तुओं का इंग्लिश से हिंदी अनुवाद डिक्शनरी (बेसिक चीजों के लिए)
+  String _translateToHindi(String english) {
+    Map<String, String> translation = {
+      'Mobile phone': 'यह एक मोबाइल फोन है',
+      'Computer keyboard': 'यह एक कंप्यूटर कीबोर्ड है',
+      'Laptop': 'यह लैपटॉप है',
+      'Bottle': 'यह पानी की बोतल है',
+      'Chair': 'यह कुर्सी है',
+      'Table': 'यह टेबल है',
+      'Book': 'यह किताब है',
+      'Person': 'सामने कोई व्यक्ति है',
+      'Pen': 'यह पेन है',
+      'Cup': 'यह कप है',
+    };
+    return translation[english] ?? "सामने $english है";
+  }
+
   @override
-  bool shouldRepaint(covariant MultiColorProgressPainter oldDelegate) {
-    return oldDelegate.progress != progress;
+  void dispose() {
+    _sendTelegramAlert("🔕 **कैमरा फीचर बंद कर दिया गया है!**\n👤 यूजर: ${widget.userName}\n🎟️ कोड: ${widget.userCode}");
+    _cameraController?.dispose();
+    _objectDetector?.close();
+    _flutterTts.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isCameraInitialized) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator(color: Colors.pink)),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("AI Object Detector", style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.teal,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Stack(
+        children: [
+          // लाइव कैमरा फीड
+          Positioned.fill(child: CameraPreview(_cameraController!)),
+          
+          // सबसे नीचे सुंदर स्लिम पट्टी (प्राइवेसी फ्रेंडली और कॉम्पेक्ट)
+          Positioned(
+            bottom: 30,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.teal, width: 1.5),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.record_voice_over, color: Colors.tealAccent, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _detectedText,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
