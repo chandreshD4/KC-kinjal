@@ -1,5 +1,5 @@
 name: kc_aradhana
-description: "A new Flutter project."
+description: "KC Aradhana Music and AI Companion Application"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -16,13 +16,21 @@ dependencies:
   shared_preferences: ^2.2.0
   http: ^1.1.0
   permission_handler: ^11.0.1
+  device_info_plus: ^10.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  image_path: "assets/icon.png"
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
   assets:
     - assets/profile.png
+    - assets/icon.png
