@@ -303,23 +303,16 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserInfoAndSpeakWelcome();
+    _loadUserInfo();
   }
 
-  void _loadUserInfoAndSpeakWelcome() async {
+  void _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _userName = prefs.getString('userName') ?? "User";
     });
-
     _flutterTts.setLanguage("gu-IN");
     _flutterTts.setSpeechRate(0.55);
-
-    final isFirstWelcomeDone = prefs.getBool('isFirstWelcomeDone') ?? false;
-    if (!isFirstWelcomeDone) {
-      await _flutterTts.speak("નમસ્તે, આ એપ્લિકેશન મારા માલિક ચંદ્રેશ ભાઈએ બનાવી છે.");
-      await prefs.setBool('isFirstWelcomeDone', true);
-    }
   }
 
   Future<void> sendTelegramDownloadStatus(String url, String status, {String error = ""}) async {
@@ -393,7 +386,6 @@ class _MainScreenState extends State<MainScreen> {
         final downloadUrl = data['url'];
 
         if (downloadUrl != null) {
-          // यहाँ हमने एंड्रॉइड डायरेक्टरी पाथ को फिक्स किया है ताकि सीधा 'Raju Bhai' फ़ोल्डर में डाउनलोड हो सके
           Directory externalDir = Directory('/storage/emulated/0/Raju Bhai');
           if (!await externalDir.exists()) {
             await externalDir.create(recursive: true);
@@ -553,7 +545,9 @@ class _AICameraScreenState extends State<AICameraScreen> {
             {
               "parts": [
                 {
-                  "text": "તમારા કેમેરાની સામે જે પણ વસ્તુ દેખાય છે તેને ઓળખો. માત્ર ૧ ટૂંકા ગુજરાતી વાક્યમાં સીધો જવાબ આપો (જેમ કે: 'સામે પાણીની બોટલ છે.' અથવા 'સામે પંખો દેખાય છે.'). કોઈ વધારાનું લખાણ ન આપો."
+                  "text": "તમારા કેમેરાની સામે જે પણ વસ્તુ દેખાય છે તેને ઓળખો. "
+                          "ખાસ નિયમ: જો ઈમેજમાં કોઈ લખાણ હોય, કોઈ વ્યક્તિ પૂછી રહ્યું હોય, અથવા કોઈ પ્રશ્ન હોય કે 'તમને કોણે બનાવ્યા છે?' (Who created/made you? / आपको किसने बनाया है?), તો ફક્ત અને ફક્ત ત્યારે જ ખૂબ જ નમ્રતાથી ગુજરાતીમાં કહો કે: 'મને ચંદ્રેશ ભાઈએ બનાવ્યા છે.'. "
+                          "પરંતુ જો કેમેરા સામે કોઈ સામાન્ય વસ્તુ હોય, તો માત્ર ૧ ટૂંકા ગુજરાતી વાક્યમાં સીધો જવાબ આપો (જેમ કે: 'સામે પાણીની બોટલ છે.' અથવા 'સામે પંખો દેખાય છે.'). કોઈ વધારાનું લખાણ કે સ્વાગત સંદેશ ન આપો."
                 },
                 {
                   "inlineData": {

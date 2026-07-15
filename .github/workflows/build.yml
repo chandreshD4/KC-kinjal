@@ -25,6 +25,9 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable'
 
+      - name: Create Missing Android Project Files
+        run: flutter create . --platforms android
+
       - name: Install dependencies
         run: flutter pub get
 
