@@ -1,5 +1,5 @@
 name: kc_aradhana
-description: "KC Aradhana Music and AI Companion Application"
+description: "KC Aradhana Music and Gemini AI Companion Application"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,8 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  google_mlkit_image_labeling: ^0.12.0
-  path_provider: ^2.1.1
   camera: ^0.10.5
   flutter_tts: ^3.8.5
   shared_preferences: ^2.2.0
