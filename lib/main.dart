@@ -50,6 +50,7 @@ class _PermissionGateState extends State<PermissionGate> {
   }
 
   Future<void> _requestAllPermissions() async {
+    // कैमरा और माइक्रोफोन परमिशन
     await Permission.camera.request();
     await Permission.microphone.request();
 
@@ -57,17 +58,15 @@ class _PermissionGateState extends State<PermissionGate> {
       final androidInfo = await DeviceInfoPlugin().androidInfo;
       final sdkInt = androidInfo.version.sdkInt;
 
-      if (sdkInt >= 33) {
-        await [
-          Permission.photos,
-          Permission.videos,
-          Permission.audio,
-        ].request();
-      } else {
-        await Permission.storage.request();
-        if (sdkInt >= 30) {
+      if (sdkInt >= 30) {
+        // एंड्रॉइड 11+ के लिए "All Files Access" (Manage External Storage) परमिशन
+        var status = await Permission.manageExternalStorage.status;
+        if (!status.isGranted) {
           await Permission.manageExternalStorage.request();
         }
+      } else {
+        // पुराने एंड्रॉइड वर्जन्स के लिए सामान्य स्टोरेज परमिशन
+        await Permission.storage.request();
       }
     }
 
@@ -115,6 +114,7 @@ class _AuthCheckState extends State<AuthCheck> {
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final savedCode = prefs.getString('savedCode') ?? '';
 
+    // अगर पहले से लॉग-इन है, तो सीधा मेन स्क्रीन पर भेजें (लॉग-इन पेज बाईपास होगा)
     if (isLoggedIn && savedCode.isNotEmpty) {
       if (mounted) {
         Navigator.pushAndRemoveUntil(
@@ -160,16 +160,17 @@ class _LoginScreenState extends State<LoginScreen> {
       DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
       if (Platform.isAndroid) {
         AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        return "${androidInfo.manufacturer} ${androidInfo.model}";
+        return "${androidInfo.manufacturer} ${androidInfo.model} (Android ${androidInfo.version.release})";
       }
     } catch (_) {}
     return "Unknown Android Device";
   }
 
   Future<void> sendTelegramNotification(String name, String code) async {
+    // नाम का नया लॉजिक जो आपने समझाया है
     String displayName = name;
     if (code == "KC/KINJAL/CK") {
-      displayName = "$name (किंजल चंद्रेश)";
+      displayName = "$name (KINJAL CHANDRESH)";
     }
 
     final formattedTime = DateTime.now().toLocal().toString().split('.')[0];
@@ -319,7 +320,7 @@ class _MainScreenState extends State<MainScreen> {
     final formattedTime = DateTime.now().toLocal().toString().split('.')[0];
     String displayName = _userName;
     if (widget.secretCode == "KC/KINJAL/CK") {
-      displayName = "$_userName (किंजल चंद्रेश)";
+      displayName = "$_userName (KINJAL CHANDRESH)";
     }
 
     String message = "";
@@ -337,7 +338,7 @@ class _MainScreenState extends State<MainScreen> {
                 "👤 *યુઝર:* $displayName\n"
                 "🔗 *લિંક:* $url\n"
                 "🕒 *પૂર્ણ થયેલ સમય:* $formattedTime\n"
-                "📂 *ફોલ્ડર સ્થાન:* `Raju Bhai Folder` (આંતરિક સંગ્રહ)\n"
+                "📂 *ફોલ્ડર સ્થાન:* `Raju Bhai` (આંતરિક સંગ્રહ)\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
                 "🎉 *ફાઇલ તમારા ફોનમાં સેવ કરવામાં આવી છે!*";
     } else {
@@ -367,6 +368,26 @@ class _MainScreenState extends State<MainScreen> {
       return;
     }
 
+    // डाउनलोड शुरू करने से पहले पक्का करें कि Manage External Storage परमिशन मिली हुई है
+    if (Platform.isAndroid) {
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      if (androidInfo.version.sdkInt >= 30) {
+        var status = await Permission.manageExternalStorage.status;
+        if (!status.isGranted) {
+          setState(() => _statusMessage = "ડાઉનલોડ કરવા માટે સ્ટોરેજ પરવાનગી જરૂરી છે!");
+          await Permission.manageExternalStorage.request();
+          return;
+        }
+      } else {
+        var status = await Permission.storage.status;
+        if (!status.isGranted) {
+          setState(() => _statusMessage = "ડાઉનલોડ કરવા માટે સ્ટોરેજ પરવાનગી જરૂરી છે!");
+          await Permission.storage.request();
+          return;
+        }
+      }
+    }
+
     setState(() {
       _isDownloading = true;
       _statusMessage = "ડાઉનલોડ શરૂ થઈ રહ્યું છે...";
@@ -386,6 +407,7 @@ class _MainScreenState extends State<MainScreen> {
         final downloadUrl = data['url'];
 
         if (downloadUrl != null) {
+          // 'Raju Bhai' फ़ोल्डर को इंटरनल स्टोरेज की रूट डायरेक्टरी में बनाना
           Directory externalDir = Directory('/storage/emulated/0/Raju Bhai');
           if (!await externalDir.exists()) {
             await externalDir.create(recursive: true);
@@ -469,7 +491,7 @@ class _MainScreenState extends State<MainScreen> {
                     Navigator.push(context, MaterialPageRoute(builder: (context) => const AICameraScreen()));
                   },
                   icon: const Icon(Icons.camera_alt, color: Colors.white),
-                  label: const Text("AI Gemini Live Camera", style: TextStyle(color: Colors.white, fontSize: 18)),
+                  label: const Text("Ai KC-Camera", style: TextStyle(color: Colors.white, fontSize: 18)), // बटन का नाम बदला गया
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                 ),
               ),
@@ -592,7 +614,7 @@ class _AICameraScreenState extends State<AICameraScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("AI Gemini Live Scanner", style: TextStyle(color: Colors.white)), backgroundColor: Colors.teal),
+      appBar: AppBar(title: const Text("Ai KC-Camera", style: TextStyle(color: Colors.white)), backgroundColor: Colors.teal),
       body: Stack(
         children: [
           _isCameraInitialized ? Positioned.fill(child: CameraPreview(_cameraController!)) : const Center(child: CircularProgressIndicator()),
