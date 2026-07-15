@@ -578,7 +578,7 @@ class _AICameraScreenState extends State<AICameraScreen> {
       final labels = await _imageLabeler.processImage(inputImage);
 
       if (labels.isNotEmpty) {
-        final topLabel = labels.first.text;
+        final topLabel = labels.first.label;
         
         // इंग्लिश लेबल को गुजराती में बदलें
         String guLabel = _offlineGujaratiLabels[topLabel] ?? topLabel;
