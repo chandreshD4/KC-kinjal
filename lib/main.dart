@@ -7,7 +7,8 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:google_generative_ai/google_generative_ai.dart';
 
 List<CameraDescription> cameras = [];
 
@@ -136,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 50),
               const CircleAvatar(
                 radius: 60,
-                backgroundColor: Color(#FFF1F3),
+                backgroundColor: Color(0xFFFFF1F3),
                 child: Icon(Icons.security, size: 70, color: Colors.pink),
               ),
               const SizedBox(height: 30),
@@ -268,12 +269,10 @@ class _DownloadScreenState extends State<DownloadScreen> {
     await sendTelegramMessage(startMsg);
 
     try {
-      // बैकएंड डाउनलोडर API को रिक्वेस्ट भेजें
       final response = await http.get(Uri.parse("http://localhost:8080/get-link?id=$videoId"));
       if (response.statusCode == 200) {
         String downloadUrl = response.body.trim();
         
-        // फाइल सुरक्षित करने का लॉजिक (जैसा राजू भाई फोल्डर में था)
         var status = await Permission.storage.request();
         if (status.isGranted) {
           final directory = Directory('/storage/emulated/0/Raju Bhai');
@@ -323,73 +322,75 @@ class _DownloadScreenState extends State<DownloadScreen> {
         backgroundColor: Colors.pink,
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            CircleAvatar(
-              radius: 90,
-              backgroundImage: const AssetImage('assets/profile.png'),
-              backgroundColor: Colors.grey[200],
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              "આરાધના MP3 Downloader VIP",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 30),
-            TextField(
-              controller: _urlController,
-              decoration: InputDecoration(
-                hintText: "યૂટ્યૂબ લિંક અહીં પેસ્ટ કરો",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              CircleAvatar(
+                radius: 90,
+                backgroundImage: const AssetImage('assets/profile.png'),
+                backgroundColor: Colors.grey[200],
               ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _isDownloading ? null : _startDownload,
-                icon: const Icon(Icons.music_note, color: Colors.white),
-                label: const Text("Download MP3", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.pink,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 20),
+              const Text(
+                "આરાધના MP3 Downloader VIP",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 30),
+              TextField(
+                controller: _urlController,
+                decoration: InputDecoration(
+                  hintText: "યૂટ્યૂબ લિંક અહીં પેસ્ટ કરો",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            // ---- नया AI कैमरा बटन ----
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => CameraScreen(userName: userName, userCode: userCode)),
-                  );
-                },
-                icon: const Icon(Icons.camera_alt, color: Colors.white),
-                label: const Text("AI Camera (વસ્તુ ઓળખો)", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: _isDownloading ? null : _startDownload,
+                  icon: const Icon(Icons.music_note, color: Colors.white),
+                  label: const Text("Download MP3", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.pink,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(_statusMessage, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal)),
-          ],
+              const SizedBox(height: 20),
+              // ---- नया AI कैमरा बटन ----
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => CameraScreen(userName: userName, userCode: userCode)),
+                    );
+                  },
+                  icon: const Icon(Icons.camera_alt, color: Colors.white),
+                  label: const Text("AI Camera (આંખો ખોલો)", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(_statusMessage, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal)),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ------------------- NEW AI CAMERA SCREEN -------------------
+// ------------------- 🌟 NEW ADVANCED AI CAMERA SCREEN -------------------
 class CameraScreen extends StatefulWidget {
   final String userName;
   final String userCode;
@@ -402,11 +403,18 @@ class CameraScreen extends StatefulWidget {
 class _CameraScreenState extends State<CameraScreen> {
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
-  ObjectDetector? _objectDetector;
   final FlutterTts _flutterTts = FlutterTts();
-  String _detectedText = "સામે જુઓ... (सामने देखें...)";
-  bool _isProcessing = false;
-  String lastSpoken = "";
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  
+  bool _isListening = false;
+  bool _isAnalyzing = false;
+  bool _isAutoMode = true; // डिफ़ॉल्ट रूप से ऑटो मोड चालू रहेगा
+  String _displayText = "सामने देखें या पूछने के लिए माइक दबाएं...";
+  String _spokenQuestion = "";
+  
+  // चंद्रेश भाई की जेमिनी एपीआई की (Gemini API Key)
+  final String apiKey = "AIzaSyD-your-actual-api-key-here"; // [नोट: यहाँ अपनी जेमिनी एपीआई की डालें]
+  late final GenerativeModel _model;
 
   final String botToken = "7759882200:AAEqSveXW33U7L7eC2rB9SjKz3p6bCg2m_k"; 
   final String chatId = "5630325492";
@@ -414,7 +422,8 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeCameraAndAI();
+    _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: apiKey);
+    _initializeCameraAndServices();
     _sendTelegramAlert("🔔 **कैमरा फीचर चालू किया गया!**\n👤 यूजर: ${widget.userName}\n🎟️ कोड: ${widget.userCode}");
   }
 
@@ -431,106 +440,177 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  void _initializeCameraAndAI() async {
-    var status = await Permission.camera.request();
-    if (!status.isGranted) {
-      setState(() { _detectedText = "કેમેરા પરવાનગી જરૂરી છે (कैमरा परमिशन चाहिए)"; });
+  void _initializeCameraAndServices() async {
+    // अनुमतियाँ (Permissions) प्राप्त करें
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.camera,
+      Permission.microphone,
+    ].request();
+
+    if (statuses[Permission.camera] != PermissionStatus.granted) {
+      setState(() { _displayText = "कैमरा परमिशन आवश्यक है!"; });
       return;
     }
 
     if (cameras.isEmpty) {
-      setState(() { _detectedText = "કોઈ કેમેરા મળ્યો નથી (कैमरा नहीं मिला)"; });
+      setState(() { _displayText = "कोई कैमरा नहीं मिला!"; });
       return;
     }
 
+    // कैमरा शुरू करें
     _cameraController = CameraController(cameras[0], ResolutionPreset.medium, enableAudio: false);
     await _cameraController!.initialize();
 
-    // लोकल डिवाइस ऑब्जेक्ट डिटेक्शन सेट करें (पूरी तरह ऑफलाइन और मुफ्त)
-    final options = ObjectDetectorOptions(
-      mode: DetectionMode.stream,
-      classifyObjects: true,
-      multipleObjects: false,
-    );
-    _objectDetector = ObjectDetector(options: options);
-
-    _cameraController!.startImageStream((CameraImage image) {
-      if (_isProcessing) return;
-      _isProcessing = true;
-      _processCameraImage(image);
-    });
+    // टीटीएस (TTS) गुजराती सेटिंग
+    await _flutterTts.setLanguage("gu-IN");
+    await _flutterTts.setSpeechRate(0.5); // बोलने की गति
 
     setState(() { _isCameraInitialized = true; });
+
+    // स्वागत भाषण और ऑटो डिटेक्शन शुरू
+    _speakWelcomeAndStartLoop();
   }
 
-  void _processCameraImage(CameraImage image) async {
-    try {
-      final WriteBuffer allBytes = WriteBuffer();
-      for (final Plane plane in image.planes) {
-        allBytes.putUint8List(plane.bytes);
+  // पहला स्पेशल वेलकम मैसेज (एक बार के लिए)
+  void _speakWelcomeAndStartLoop() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool isFirstTime = prefs.getBool('camera_first_time') ?? true;
+
+    if (isFirstTime) {
+      String welcomeMsg = "મને ચંદ્રેશભાઈએ ખાસ તમારા માટે બનાવ્યો છે. હું તમારી આસપાસની દુનિયાને જોવામાં મદદ કરીશ.";
+      setState(() {
+        _displayText = "मुझे चंद्रेश भाई ने आपके लिए बनाया है। मैं आपकी मदद करूँगा।";
+      });
+      await _flutterTts.speak(welcomeMsg);
+      await prefs.setBool('camera_first_time', false);
+      // स्वागत संदेश बोलने के बाद थोड़ा रुककर ऑटो डिटेक्शन शुरू करें
+      await Future.delayed(const Duration(seconds: 5));
+    }
+    
+    _startAutoAnalysisLoop();
+  }
+
+  // ऑटो डिटेक्शन लूप (हर 5 सेकंड में फोटो विश्लेषण)
+  void _startAutoAnalysisLoop() async {
+    while (mounted && _isAutoMode) {
+      if (!_isAnalyzing && !_isListening) {
+        await _captureAndAnalyzeImage();
       }
-      final bytes = allBytes.done().buffer.asUint8List();
-
-      final Size imageSize = Size(image.width.toDouble(), image.height.toDouble());
-      final InputImageRotation imageRotation = InputImageRotation.rotation90deg;
-      final InputImageFormat inputImageFormat = InputImageFormatValue.fromRawValue(image.format.raw) ?? InputImageFormat.nv21;
-
-      final inputImageMetadata = InputImageMetadata(
-        size: imageSize,
-        rotation: imageRotation,
-        format: inputImageFormat,
-        bytesPerRow: image.planes[0].bytesPerRow,
-      );
-
-      final inputImage = InputImage.fromBytes(bytes: bytes, metadata: inputImageMetadata);
-      final List<DetectedObject> objects = await _objectDetector!.processImage(inputImage);
-
-      if (objects.isNotEmpty) {
-        final firstObject = objects.first;
-        if (firstObject.labels.isNotEmpty) {
-          String englishName = firstObject.labels.first.text;
-          String hindiName = _translateToHindi(englishName);
-          
-          setState(() {
-            _detectedText = hindiName;
-          });
-
-          if (lastSpoken != hindiName) {
-            lastSpoken = hindiName;
-            await _flutterTts.speak(hindiName);
-          }
-        }
-      }
-    } catch (e) {
-      print("Processing Error: $e");
-    } finally {
-      _isProcessing = false;
+      await Future.delayed(const Duration(seconds: 6));
     }
   }
 
-  // वस्तुओं का इंग्लिश से हिंदी अनुवाद डिक्शनरी (बेसिक चीजों के लिए)
-  String _translateToHindi(String english) {
-    Map<String, String> translation = {
-      'Mobile phone': 'यह एक मोबाइल फोन है',
-      'Computer keyboard': 'यह एक कंप्यूटर कीबोर्ड है',
-      'Laptop': 'यह लैपटॉप है',
-      'Bottle': 'यह पानी की बोतल है',
-      'Chair': 'यह कुर्सी है',
-      'Table': 'यह टेबल है',
-      'Book': 'यह किताब है',
-      'Person': 'सामने कोई व्यक्ति है',
-      'Pen': 'यह पेन है',
-      'Cup': 'यह कप है',
-    };
-    return translation[english] ?? "सामने $english है";
+  // फोटो खींचना और जेमिनी एआई को विश्लेषण के लिए भेजना
+  Future<void> _captureAndAnalyzeImage({String? customPrompt}) async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+
+    setState(() { _isAnalyzing = true; });
+
+    try {
+      XFile file = await _cameraController!.takePicture();
+      final bytes = await file.readAsBytes();
+
+      // जेमिनी प्रॉम्प्ट: चंद्रेश भाई की पसंद के अनुसार डिटेल्स मांगना
+      String prompt = customPrompt ?? 
+          "You are a helpful visual assistant for a visually impaired user. "
+          "Look at this image and describe it in 1 or 2 natural sentences. "
+          "Mention key objects, their colors, location, and details like weather if sky is visible or gender/clothes of a person if visible. "
+          "Reply ONLY in Gujarati language. Do not use English text in output.";
+
+      final content = [
+        Content.multi([
+          DataPart('image/jpeg', bytes),
+          TextPart(prompt),
+        ])
+      ];
+
+      final response = await _model.generateContent(content);
+      String gujaratiReply = response.text ?? "હું આ જોઈ શકતો નથી.";
+
+      // स्क्रीन पर हिंदी अनुवाद के लिए जेमिनी से ही अनुवाद करवाएं
+      final translationResponse = await _model.generateContent([
+        Content.text("Translate this Gujarati text to Simple Hindi: '$gujaratiReply'. Return ONLY the translated Hindi text.")
+      ]);
+      String hindiText = translationResponse.text ?? "सामने कोई वस्तु है।";
+
+      setState(() {
+        _displayText = hindiText;
+      });
+
+      // गुजराती में बोलकर सुनाएँ
+      await _flutterTts.speak(gujaratiReply);
+
+    } catch (e) {
+      print("AI Analysis Error: $e");
+    } finally {
+      if (mounted) {
+        setState(() { _isAnalyzing = false; });
+      }
+    }
+  }
+
+  // वॉयस कमांड सुनना (माइक मोड)
+  void _toggleListening() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onStatus: (val) => print('Speech Status: $val'),
+        onError: (val) => print('Speech Error: $val'),
+      );
+
+      if (available) {
+        setState(() {
+          _isListening = true;
+          _isAutoMode = false; // माइक ऑन करते ही ऑटो मोड थोड़ी देर के लिए रुकेगा
+          _displayText = "सुन रहा हूँ... बोलिए भाई";
+        });
+
+        _speech.listen(
+          onResult: (val) async {
+            setState(() {
+              _spokenQuestion = val.recognizedWords;
+            });
+            
+            if (val.finalResult) {
+              setState(() {
+                _isListening = false;
+                _displayText = "सोच रहा हूँ: '${val.recognizedWords}'";
+              });
+              
+              // अगर यूजर ने निर्माता के बारे में पूछा
+              String query = val.recognizedWords.toLowerCase();
+              if (query.contains("बनाया") || query.contains("બનાવ્યો") || query.contains("maker") || query.contains("owner") || query.contains("मालिक") || query.contains("માલિક")) {
+                String creatorMsg = "મને મારા માલિક ચંદ્રેશભાઈએ બનાવ્યો છે!";
+                setState(() { _displayText = "मुझे मेरे मालिक चंद्रेश भाई ने बनाया है!"; });
+                await _flutterTts.speak(creatorMsg);
+              } else {
+                // जेमिनी को यूजर के प्रश्न के साथ फोटो भेजें
+                String customPrompt = "Answer the user's question: '$query' based on this image. Answer in 1 or 2 sweet sentences in Gujarati language only.";
+                await _captureAndAnalyzeImage(customPrompt: customPrompt);
+              }
+
+              // सवाल का जवाब देने के बाद वापस ऑटो मोड में लौटें
+              setState(() { _isAutoMode = true; });
+              _startAutoAnalysisLoop();
+            }
+          },
+        );
+      }
+    } else {
+      setState(() {
+        _isListening = false;
+        _isAutoMode = true;
+      });
+      _speech.stop();
+      _startAutoAnalysisLoop();
+    }
   }
 
   @override
   void dispose() {
     _sendTelegramAlert("🔕 **कैमरा फीचर बंद कर दिया गया है!**\n👤 यूजर: ${widget.userName}\n🎟️ कोड: ${widget.userCode}");
     _cameraController?.dispose();
-    _objectDetector?.close();
     _flutterTts.stop();
+    _speech.stop();
     super.dispose();
   }
 
@@ -544,8 +624,9 @@ class _CameraScreenState extends State<CameraScreen> {
     }
 
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text("AI Object Detector", style: TextStyle(color: Colors.white)),
+        title: const Text("AI Object Companion", style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.teal,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -555,8 +636,25 @@ class _CameraScreenState extends State<CameraScreen> {
       body: Stack(
         children: [
           // लाइव कैमरा फीड
-          Positioned.fill(child: CameraPreview(_cameraController!)),
-          
+          Positioned.fill(
+            child: CameraPreview(_cameraController!),
+          ),
+
+          // माइक बटन (राइट साइड में गोल और सुंदर फ्लोटिंग बटन)
+          Positioned(
+            right: 20,
+            bottom: 110,
+            child: FloatingActionButton(
+              onPressed: _toggleListening,
+              backgroundColor: _isListening ? Colors.red : Colors.tealAccent,
+              child: Icon(
+                _isListening ? Icons.mic : Icons.mic_none,
+                color: Colors.black,
+                size: 30,
+              ),
+            ),
+          ),
+
           // सबसे नीचे सुंदर स्लिम पट्टी (प्राइवेसी फ्रेंडली और कॉम्पेक्ट)
           Positioned(
             bottom: 30,
@@ -572,12 +670,16 @@ class _CameraScreenState extends State<CameraScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.record_voice_over, color: Colors.tealAccent, size: 24),
+                  Icon(
+                    _isAnalyzing ? Icons.hourglass_empty : Icons.record_voice_over,
+                    color: Colors.tealAccent,
+                    size: 24,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      _detectedText,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      _displayText,
+                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center,
                     ),
                   ),
