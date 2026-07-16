@@ -6,8 +6,8 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 
-// यहाँ अपनी गूगल एआई स्टूडियो वाली चाबी पेस्ट करें
-const String GEMINI_API_KEY = "यहाँ_अपनी_चाबी_डालें";
+// अब चाबी यहाँ नहीं रहेगी, बल्कि गिटहब इसे बैकग्राउंड से सुरक्षित पास करेगा
+const String GEMINI_API_KEY = String.fromEnvironment('GEMINI_KEY');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +40,7 @@ class _MainCameraScreenState extends State<MainCameraScreen> {
   late FlutterTts _flutterTts;
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
-  String _aiResponseText = "લાઈવ કેમેરા શરૂ થઈ રહ્યો છે...";
+  String _aiResponseText = "લાઇવ કેમેરા શરૂ થઈ રહ્યો છે...";
   Timer? _analysisTimer;
 
   @override
@@ -75,16 +75,15 @@ class _MainCameraScreenState extends State<MainCameraScreen> {
       await _cameraController!.initialize();
       if (mounted) {
         setState(() => _isCameraInitialized = true);
-        
-        // कैमरा खुलते ही सबसे पहले एक बार गुजराती में बोलेगा
         await _flutterTts.speak("મને ચંદ્રેશ ભાઈએ બનાવ્યા છે.");
 
-        // हर 5 सेकंड में बिना किसी बटन के ऑटोमैटिक लाइव स्कैन करेगा
-        _analysisTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+        _analysisTimer = Timer.periodic(const Duration(seconds: 6), (timer) {
           _scanLiveFrame();
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      setState(() => _aiResponseText = "કેમેરા શરૂ કરવામાં ભૂલ: $e");
+    }
   }
 
   Future<void> _scanLiveFrame() async {
@@ -97,6 +96,11 @@ class _MainCameraScreenState extends State<MainCameraScreen> {
       final bytes = await image.readAsBytes();
       final base64Image = base64Encode(bytes);
 
+      if (GEMINI_API_KEY.isEmpty || GEMINI_API_KEY == 'null') {
+        setState(() => _aiResponseText = "ભૂલ: ચાબી સેટ નથી! ગિટહબ સીક્રેટ્સ ચેક કરો.");
+        return;
+      }
+
       final response = await http.post(
         Uri.parse("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY"),
         headers: {"Content-Type": "application/json"},
@@ -105,7 +109,7 @@ class _MainCameraScreenState extends State<MainCameraScreen> {
             {
               "parts": [
                 {
-                  "text": "તમારા કેમેરાની સામે જે પણ વસ્તુ દેખાય છે તેને ઓળખો. ખાસ નિયમ: જો ઈમેજમાં કોઈ લખાણ હોય, કોઈ વ્યક્તિ પૂછી રહ્યું હોય, અથવા કોઈ પ્રશ્ન હોય કે 'તમને કોણે બનાવ્યા છે?', તો ફક્ત ત્યારે જ કહો કે: 'મને ચંદ્રેશ ભાઈએ બનાવ્યા છે.'. પરંતુ જો સામાન્ય વસ્તુ હોય, તો માત્ર ૧ ટૂંકા ગુજરાતી વાક્યમાં સીધો જવાબ આપો (જેમ કે: 'સામે ખુરશી છે'). કોઈ વધારાનું લખાણ ન આપો."
+                  "text": "તમારી સામે જે પણ વસ્તુ છે તેને ઓળખો અને ૧ ટૂંકા ગુજરાતી વાક્યમાં સીધો જવાબ આપો."
                 },
                 {
                   "inlineData": {"mimeType": "image/jpeg", "data": base64Image}
@@ -114,7 +118,7 @@ class _MainCameraScreenState extends State<MainCameraScreen> {
             }
           ]
         })
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -126,8 +130,20 @@ class _MainCameraScreenState extends State<MainCameraScreen> {
           });
           await _flutterTts.speak(_aiResponseText);
         }
+      } else {
+        if (mounted) {
+          setState(() {
+            _aiResponseText = "સર્વર ભૂલ: ${response.statusCode}\nકોડ ચેક કરો.";
+          });
+        }
       }
-    } catch (_) {} finally {
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _aiResponseText = "કનેક્શન ભૂલ: ઈન્ટરનેટ ચેક કરો.";
+        });
+      }
+    } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
   }
@@ -167,7 +183,7 @@ class _MainCameraScreenState extends State<MainCameraScreen> {
                   Text(
                     _aiResponseText, 
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)
                   ),
                   const SizedBox(height: 8),
                   Row(
